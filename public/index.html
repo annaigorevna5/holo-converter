@@ -29,6 +29,7 @@
             line-height: 1.6;
             width: 100%;
             position: relative;
+            padding-top: 120px; /* Добавлено для фиксированной шапки */
         }
         
         /* ===== TYPOGRAPHY ===== */
@@ -65,7 +66,7 @@
         /* ===== LOADING SCREEN ===== */
         .loading-screen { display: none; }
         
-        /* ===== HEADER - НЕПОДВИЖНЫЙ ===== */
+        /* ===== HEADER - НЕПОДВИЖНЫЙ И ИСПРАВЛЕННЫЙ ===== */
         .main-header {
             background: rgba(20, 25, 60, 0.95);
             border-bottom: 2px solid #00aaff;
@@ -78,6 +79,8 @@
             z-index: 1000;
             width: 100%;
             box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+            transform: translateZ(0); /* Аппаратное ускорение */
+            -webkit-transform: translateZ(0);
         }
         .header-content {
             max-width: 1400px;
@@ -162,7 +165,7 @@
         .content-area {
             flex: 1;
             max-width: 1400px;
-            margin: 100px auto 30px;
+            margin: 0 auto 30px; /* Убрали отступ сверху, так как body имеет padding-top */
             padding: 0 15px;
             display: grid;
             grid-template-columns: 1fr;
@@ -259,7 +262,7 @@
         }
         .hint i { margin: 0 4px; }
         
-        /* ===== ЛЕГЕНДА ГЛОБУСА ===== */
+        /* ===== ЛЕГЕНДА ГЛОБУСА - ИСПРАВЛЕНА ДЛЯ ПРОКРУТКИ ===== */
         .globe-legend {
             position: absolute;
             top: 70px;
@@ -271,12 +274,13 @@
             color: white;
             font-family: 'Exo 2', sans-serif;
             width: 280px;
-            max-height: 400px;
+            max-height: 70vh; /* Используем vh вместо фиксированной высоты */
             overflow-y: auto;
             backdrop-filter: blur(15px);
             z-index: 99;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
             animation: fadeIn 0.3s ease-out;
+            -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
         }
         .globe-legend-toggle {
             position: absolute;
@@ -308,6 +312,10 @@
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 1px solid rgba(0, 150, 255, 0.3);
+            position: sticky;
+            top: 0;
+            background: rgba(10, 15, 40, 0.95);
+            z-index: 1;
         }
         .legend-header h4 {
             margin: 0;
@@ -948,6 +956,7 @@
             max-height: 300px;
             overflow-y: auto;
             padding-right: 5px;
+            -webkit-overflow-scrolling: touch; /* Плавная прокрутка на iOS */
         }
         .changes-list::-webkit-scrollbar {
             width: 6px;
@@ -1423,10 +1432,13 @@
         
         /* ===== RESPONSIVE ===== */
         @media (min-width: 768px) {
+            body {
+                padding-top: 140px; /* Увеличиваем для больших экранов */
+            }
             .content-area {
                 grid-template-columns: 1fr 1fr;
                 gap: 30px;
-                margin: 120px auto 40px;
+                margin: 0 auto 40px; /* Убрали отступ сверху */
                 padding: 0 20px;
             }
             .tagline { display: block; }
@@ -1445,6 +1457,9 @@
         }
         
         @media (max-width: 767px) {
+            body {
+                padding-top: 160px; /* Больше места для шапки на мобильных */
+            }
             .header-content { flex-direction: column; gap: 15px; }
             .logo { min-width: 100%; justify-content: center; }
             .tagline { text-align: center; }
@@ -1462,10 +1477,15 @@
                 right: 15px;
                 max-width: 400px;
                 margin: 0 auto;
+                top: 80px; /* Немного ниже для мобильных */
+                max-height: 60vh; /* Меньше высота на мобильных */
             }
         }
         
         @media (max-width: 480px) {
+            body {
+                padding-top: 170px; /* Еще больше места для шапки на очень маленьких экранах */
+            }
             h1 { font-size: 1.6rem; }
             h2 { font-size: 1.2rem; }
             h3 { font-size: 1rem; }
@@ -1484,7 +1504,61 @@
             .modal-dialog { max-height: 90vh; }
         }
         
-        /* ===== ТАЧ ЭФФЕКТЫ ДЛЯ МОБИЛ ===== */
+        /* ===== ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ ===== */
+        
+        /* Убираем выделение при тапе */
+        * {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* Но оставляем для инпутов */
+        input, textarea {
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+        
+        /* Предотвращаем увеличение при фокусе на мобильных */
+        input[type="number"] {
+            font-size: 16px !important; /* Предотвращает зум на iOS */
+        }
+        
+        /* Улучшаем реакцию на тапы */
+        button, .currency-chip, .amount-btn, .action-btn, .mode-option, .change-item {
+            min-height: 44px; /* Минимальная высота для тапа по стандартам Apple */
+        }
+        
+        /* Улучшаем кликабельность маркеров на глобусе */
+        .globe-marker {
+            cursor: pointer;
+            pointer-events: all;
+            transform: translateZ(0); /* Аппаратное ускорение */
+        }
+        
+        /* Исправляем скролл легенды на iOS */
+        .globe-legend, .changes-list {
+            -webkit-overflow-scrolling: touch;
+            overflow-scrolling: touch;
+        }
+        
+        /* Улучшаем поведение при касании глобуса */
+        #globeCanvas {
+            touch-action: pan-x pan-y pinch-zoom;
+            -webkit-touch-callout: none;
+        }
+        
+        /* Улучшаем фиксированную шапку */
+        .main-header {
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            will-change: transform;
+        }
+        
+        /* ТАЧ ЭФФЕКТЫ ДЛЯ МОБИЛ */
         @media (hover: none) and (pointer: coarse) {
             .currency-chip:active,
             .amount-btn:active,
@@ -1510,8 +1584,31 @@
                 transition: transform 0.1s;
             }
             
+            /* Улучшаем отклик для глобуса */
             #globeCanvas {
                 touch-action: pan-x pan-y pinch-zoom;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
+            /* Увеличиваем область клика для легенды */
+            .legend-item {
+                padding: 12px 15px;
+                min-height: 50px;
+            }
+            
+            /* Увеличиваем область клика для элементов изменений */
+            .change-item {
+                padding: 12px 15px;
+                min-height: 55px;
+            }
+        }
+        
+        /* Предотвращаем стандартное поведение браузера на мобильных */
+        @media (max-width: 768px) {
+            body {
+                -webkit-text-size-adjust: 100%;
+                -ms-text-size-adjust: 100%;
+                text-size-adjust: 100%;
             }
         }
     </style>
@@ -1616,7 +1713,7 @@
 
     <!-- Main App Container -->
     <div class="app-container" id="appContainer">
-        <!-- Header - НЕПОДВИЖНЫЙ -->
+        <!-- Header - НЕПОДВИЖНЫЙ И ИСПРАВЛЕННЫЙ -->
         <header class="main-header">
             <div class="header-content">
                 <div class="logo">
@@ -1672,7 +1769,7 @@
                         </div>
                     </div>
                     
-                    <!-- Легенда глобуса -->
+                    <!-- Легенда глобуса - ИСПРАВЛЕНА -->
                     <div class="globe-legend" id="globeLegend" style="display: none;">
                         <div class="legend-header">
                             <h4><i class="fas fa-layer-group"></i> Currency Legend</h4>
@@ -2242,12 +2339,62 @@
                         globeLegend.style.display = 'none';
                     }
                 });
+                
+                // Предотвращаем закрытие при клике внутри легенды
+                globeLegend.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
             }
             
-            // 6. Запускаем глобус
+            // 6. Исправляем кликабельность элементов на мобильных устройствах
+            function improveMobileTouch() {
+                // Увеличиваем область клика для элементов валют
+                document.querySelectorAll('.currency-chip, .amount-btn, .action-btn, .change-item, .legend-item').forEach(element => {
+                    element.style.cursor = 'pointer';
+                    element.style.webkitTapHighlightColor = 'transparent';
+                    
+                    // Добавляем обработчик для улучшенного отклика
+                    element.addEventListener('touchstart', function() {
+                        this.style.opacity = '0.8';
+                    }, { passive: true });
+                    
+                    element.addEventListener('touchend', function() {
+                        this.style.opacity = '1';
+                    }, { passive: true });
+                });
+                
+                // Улучшаем скролл легенды
+                const legend = document.querySelector('.globe-legend');
+                if (legend) {
+                    legend.addEventListener('touchmove', function(e) {
+                        // Позволяем скроллить только если контент больше контейнера
+                        if (this.scrollHeight > this.clientHeight) {
+                            e.stopPropagation();
+                        }
+                    }, { passive: true });
+                }
+            }
+            
+            // Вызываем улучшения для мобильных
+            if ('ontouchstart' in window || navigator.maxTouchPoints) {
+                improveMobileTouch();
+            }
+            
+            // 7. Запускаем глобус
             setTimeout(() => {
                 if (window.HoloGlobe && window.HoloGlobe.init) {
                     window.HoloGlobe.init();
+                    
+                    // Добавляем улучшения для кликабельности маркеров
+                    setTimeout(() => {
+                        // Этот код должен быть в файле globe-fixed.js
+                        // Здесь просто убеждаемся, что маркеры кликабельны
+                        const canvas = document.getElementById('globeCanvas');
+                        if (canvas) {
+                            canvas.style.cursor = 'pointer';
+                            canvas.style.touchAction = 'manipulation';
+                        }
+                    }, 1000);
                 }
             }, 500);
             
@@ -2289,6 +2436,19 @@
                 };
                 return names[code] || code;
             }
+            
+            // 8. Исправление для фиксированной шапки
+            window.addEventListener('scroll', function() {
+                const header = document.querySelector('.main-header');
+                if (header) {
+                    // Добавляем тень при скролле
+                    if (window.scrollY > 10) {
+                        header.style.boxShadow = '0 5px 20px rgba(0, 0, 0, 0.5)';
+                    } else {
+                        header.style.boxShadow = '0 5px 20px rgba(0, 0, 0, 0.3)';
+                    }
+                }
+            });
         });
     </script>
 </body>
