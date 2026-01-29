@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<body>
+<script>
+// ТЕСТ
+const canvas = document.createElement('canvas');
+canvas.id = 'testCanvas';
+canvas.style.cssText = 'width:800px;height:500px;border:2px solid red;';
+document.body.appendChild(canvas);
+
+console.log('Canvas создан, запускаем Three.js...');
+
+// Загружаем Three.js
+const script = document.createElement('script');
+script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+script.onload = function() {
+    console.log('Three.js загружен!');
+    
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, 800/500, 0.1, 1000);
+    camera.position.z = 5;
+    
+    const renderer = new THREE.WebGLRenderer({canvas});
+    renderer.setSize(800, 500);
+    
+    const geometry = new THREE.SphereGeometry(2, 32, 32);
+    const material = new THREE.MeshBasicMaterial({color: 0xff0000});
+    const sphere = new THREE.Mesh(geometry, material);
+    scene.add(sphere);
+    
+    function animate() {
+        requestAnimationFrame(animate);
+        sphere.rotation.y += 0.01;
+        renderer.render(scene, camera);
+    }
+    animate();
+    
+    alert('✅ Если видишь красный вращающийся шар - всё работает!');
+};
+document.head.appendChild(script);
+</script>
+</body>
+</html>

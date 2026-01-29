@@ -1,0 +1,17 @@
+# Holo Converter - Robots.txt
+User-agent: *
+Allow: /
+Allow: /api/
+Allow: /assets/
+Disallow: /private/
+Disallow: /admin/
+Disallow: /server-status
+
+# Sitemap
+Sitemap: https://holoconverter.example.com/sitemap.xml
+
+# Crawl delay
+Crawl-delay: 2
+
+# Host
+Host: holoconverter.example.com

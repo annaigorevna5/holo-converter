@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="3D Currency Converter with AR, Hand Tracking and VR modes">
+    <meta name="keywords" content="currency converter, 3d, ar, vr, hand tracking, finance">
+    <meta name="author" content="Holo Converter">
+    <meta property="og:title" content="Holo Converter - 3D Currency Converter">
+    <meta property="og:description" content="Convert currencies in 3D space with AR, Hand Tracking and VR">
+    <meta property="og:image" content="assets/og-image.jpg">
+    <meta property="og:url" content="https://holoconverter.example.com">
+    <meta name="twitter:card" content="summary_large_image">
+    
+    <title>Holo Converter - 3D Currency Converter</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#0a0e2a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <!-- Icons -->
+    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <!-- Three.js и OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    
+    <!-- Актуальные курсы валют -->
+    <script>
+        // Актуальные курсы валют (относительно EUR)
+        const CURRENCY_RATES = {
+            "EUR": 1.0000,
+            "USD": 1.0872,
+            "GBP": 0.8531,
+            "JPY": 160.45,
+            "CHF": 0.9415,
+            "CAD": 1.4618,
+            "AUD": 1.6521,
+            "CNY": 7.8503,
+            "NZD": 1.7825,
+            "SEK": 11.385,
+            "NOK": 11.452,
+            "DKK": 7.4602,
+            "PLN": 4.3281,
+            "HUF": 384.15,
+            "CZK": 24.852,
+            "RON": 4.9735,
+            "BGN": 1.9558,
+            "TRY": 33.874,
+            "RUB": 97.845,
+            "INR": 90.127,
+            "BRL": 5.4218,
+            "ZAR": 20.487,
+            "MXN": 18.658,
+            "SGD": 1.4572,
+            "HKD": 8.4875,
+            "KRW": 1447.2,
+            "AED": 3.9915,
+            "SAR": 4.0758,
+            "THB": 38.921,
+            "MYR": 5.1428,
+            "IDR": 17045,
+            "PHP": 61.287
+        };
+        
+        // Данные для изменения курсов
+        const CURRENCY_CHANGES = [
+            { code: "TRY", name: "Turkish Lira", flag: "🇹🇷", rate: "33.874", change: "+2.4", direction: "up" },
+            { code: "JPY", name: "Japanese Yen", flag: "🇯🇵", rate: "160.45", change: "-1.8", direction: "down" },
+            { code: "BRL", name: "Brazilian Real", flag: "🇧🇷", rate: "5.4218", change: "+1.6", direction: "up" },
+            { code: "ZAR", name: "South African Rand", flag: "🇿🇦", rate: "20.487", change: "+1.2", direction: "up" },
+            { code: "RUB", name: "Russian Ruble", flag: "🇷🇺", rate: "97.845", change: "+0.9", direction: "up" },
+            { code: "MXN", name: "Mexican Peso", flag: "🇲🇽", rate: "18.658", change: "+0.7", direction: "up" },
+            { code: "INR", name: "Indian Rupee", flag: "🇮🇳", rate: "90.127", change: "+0.5", direction: "up" },
+            { code: "CNY", name: "Chinese Yuan", flag: "🇨🇳", rate: "7.8503", change: "-0.3", direction: "down" },
+            { code: "GBP", name: "British Pound", flag: "🇬🇧", rate: "0.8531", change: "-0.2", direction: "down" },
+            { code: "CHF", name: "Swiss Franc", flag: "🇨🇭", rate: "0.9415", change: "+0.4", direction: "up" },
+            { code: "CAD", name: "Canadian Dollar", flag: "🇨🇦", rate: "1.4618", change: "+0.6", direction: "up" },
+            { code: "AUD", name: "Australian Dollar", flag: "🇦🇺", rate: "1.6521", change: "+0.3", direction: "up" },
+            { code: "NZD", name: "New Zealand Dollar", flag: "🇳🇿", rate: "1.7825", change: "+0.8", direction: "up" },
+            { code: "SEK", name: "Swedish Krona", flag: "🇸🇪", rate: "11.385", change: "-0.1", direction: "down" },
+            { code: "NOK", name: "Norwegian Krone", flag: "🇳🇴", rate: "11.452", change: "+0.2", direction: "up" },
+            { code: "PLN", name: "Polish Zloty", flag: "🇵🇱", rate: "4.3281", change: "+0.3", direction: "up" },
+            { code: "HUF", name: "Hungarian Forint", flag: "🇭🇺", rate: "384.15", change: "-0.4", direction: "down" }
+        ];
+        
+        function getExchangeRate(fromCurrency, toCurrency) {
+            if (fromCurrency === toCurrency) return 1.0;
+            const rateFrom = CURRENCY_RATES[fromCurrency] || 1.0;
+            const rateTo = CURRENCY_RATES[toCurrency] || 1.0;
+            return rateTo / rateFrom;
+        }
+        
+        function convertCurrency(amount, fromCurrency, toCurrency) {
+            const rate = getExchangeRate(fromCurrency, toCurrency);
+            return amount * rate;
+        }
+    </script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loader">
+            <div class="globe-loader">
+                <i class="fas fa-globe-americas"></i>
+            </div>
+            <h2>Holo Converter</h2>
+            <p>Loading 3D experience...</p>
+            <div class="progress-bar">
+                <div class="progress" id="loadingProgress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container" id="appContainer">
+        <!-- Header -->
+        <header class="main-header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-crystal-ball"></i>
+                    <h1>Holo Converter</h1>
+                </div>
+                <p class="tagline">Convert currencies in 3D space with AR & VR</p>
+                
+                <div class="header-controls">
+                    <button class="header-btn" id="themeToggle" title="Toggle theme">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="header-btn" id="fullscreenToggle" title="Fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button class="header-btn" id="helpBtn" title="Help">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="connection-status">
+                <div class="status-indicator online">
+                    <i class="fas fa-circle"></i> Live Rates 
+                </div>
+                <div class="last-update">
+                    Source: <span id="lastUpdate">ECB Official</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            <!-- 3D Globe Section -->
+            <section class="globe-section">
+                <div class="globe-wrapper">
+                    <div class="globe-header">
+                        <h2><i class="fas fa-globe-americas"></i> Interactive 3D Globe</h2>
+                        <div class="globe-controls">
+                            <button class="control-btn" id="autoRotateToggle" title="Auto rotate">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                            <button class="control-btn" id="resetView" title="Reset view">
+                                <i class="fas fa-home"></i>
+                            </button>
+                            <button class="control-btn" id="toggleGrid" title="Toggle grid">
+                                <i class="fas fa-th"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="globe-container">
+                        <div class="globe-loading" id="globeLoading">
+                            <i class="fas fa-globe-americas fa-spin"></i>
+                            <div>Loading 3D Globe...</div>
+                            <div class="loading-sub">High-resolution textures & 35+ currencies</div>
+                        </div>
+                        
+                        <canvas id="globeCanvas"></canvas>
+                        
+                        <div class="globe-overlay">
+                            <div class="hint">
+                                <i class="fas fa-mouse-pointer"></i> Rotate globe 
+                                <i class="fas fa-hand-point-up"></i> Click currency markers
+                                <i class="fas fa-info-circle"></i> Legend on left
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Блок статистики и изменений курсов -->
+                    <div class="stats-changes-container">
+                        <!-- Статистика -->
+                        <div class="globe-stats">
+                            <div class="stat">
+                                <i class="fas fa-coins"></i>
+                                <div>
+                                    <div class="stat-value" id="currencyCount">35</div>
+                                    <div class="stat-label">Currencies</div>
+                                </div>
+                            </div>
+                            <div class="stat">
+                                <i class="fas fa-sync-alt"></i>
+                                <div>
+                                    <div class="stat-value" id="updateInterval">5m</div>
+                                    <div class="stat-label">Rate updates</div>
+                                </div>
+                            </div>
+                            <div class="stat">
+                                <i class="fas fa-bolt"></i>
+                                <div>
+                                    <div class="stat-value" id="conversionSpeed">0.1s</div>
+                                    <div class="stat-label">Conversion speed</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Изменения курсов -->
+                        <div class="currency-changes">
+                            <div class="changes-header">
+                                <h4><i class="fas fa-chart-line"></i> Today's Currency Changes</h4>
+                                <span class="changes-time">10:30 UTC</span>
+                            </div>
+                            
+                            <div class="changes-list">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Control Panel Section -->
+            <section class="control-panel">
+                <!-- Currency Selection Card -->
+                <div class="card main-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-exchange-alt"></i> Currency Selection</h3>
+                        <button class="card-action" id="refreshRates" title="Refresh rates">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="currency-selection">
+                        <div class="from-currency">
+                            <label>From:</label>
+                            <div class="currency-display" id="fromCurrencyDisplay">
+                                <div class="currency-flag">🇺🇸</div>
+                                <div class="currency-info">
+                                    <div class="currency-code">USD</div>
+                                    <div class="currency-name">US Dollar</div>
+                                </div>
+                                <input type="hidden" id="fromCurrency" value="USD">
+                            </div>
+                        </div>
+                        
+                        <button class="swap-currencies" id="swapCurrencies" title="Swap currencies">
+                            <i class="fas fa-random"></i>
+                        </button>
+                        
+                        <div class="to-currency">
+                            <label>To:</label>
+                            <div class="currency-display" id="toCurrencyDisplay">
+                                <div class="currency-flag">🇪🇺</div>
+                                <div class="currency-info">
+                                    <div class="currency-code">EUR</div>
+                                    <div class="currency-name">Euro</div>
+                                </div>
+                                <input type="hidden" id="toCurrency" value="EUR">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="popular-currencies">
+                        <p class="section-label">Popular currencies:</p>
+                        <div class="currency-grid">
+                            <button class="currency-chip" data-currency="USD">
+                                <span class="chip-flag">🇺🇸</span>
+                                <span class="chip-code">USD</span>
+                            </button>
+                            <button class="currency-chip" data-currency="EUR">
+                                <span class="chip-flag">🇪🇺</span>
+                                <span class="chip-code">EUR</span>
+                            </button>
+                            <button class="currency-chip" data-currency="GBP">
+                                <span class="chip-flag">🇬🇧</span>
+                                <span class="chip-code">GBP</span>
+                            </button>
+                            <button class="currency-chip" data-currency="JPY">
+                                <span class="chip-flag">🇯🇵</span>
+                                <span class="chip-code">JPY</span>
+                            </button>
+                            <button class="currency-chip" data-currency="CNY">
+                                <span class="chip-flag">🇨🇳</span>
+                                <span class="chip-code">CNY</span>
+                            </button>
+                            <button class="currency-chip" data-currency="CAD">
+                                <span class="chip-flag">🇨🇦</span>
+                                <span class="chip-code">CAD</span>
+                            </button>
+                            <button class="currency-chip" data-currency="AUD">
+                                <span class="chip-flag">🇦🇺</span>
+                                <span class="chip-code">AUD</span>
+                            </button>
+                            <button class="currency-chip" data-currency="CHF">
+                                <span class="chip-flag">🇨🇭</span>
+                                <span class="chip-code">CHF</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Amount Input Card -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-calculator"></i> Amount</h3>
+                        <button class="card-action voice-input" id="voiceInputBtn" title="Voice input">
+                            <i class="fas fa-microphone"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="amount-input-wrapper">
+                        <input type="number" 
+                               id="amountInput" 
+                               value="1000" 
+                               min="0" 
+                               step="0.01"
+                               placeholder="0.00"
+                               autocomplete="off">
+                        <div class="currency-symbol" id="inputCurrencySymbol">$</div>
+                    </div>
+                    
+                    <div class="quick-amounts">
+                        <button class="amount-btn" data-amount="100">100</button>
+                        <button class="amount-btn" data-amount="500">500</button>
+                        <button class="amount-btn" data-amount="1000">1,000</button>
+                        <button class="amount-btn" data-amount="5000">5,000</button>
+                        <button class="amount-btn" id="customAmount">Custom</button>
+                    </div>
+                    
+                    <div class="input-hint">
+                        <i class="fas fa-keyboard"></i> Type or use quick buttons
+                        <i class="fas fa-microphone" style="margin-left: 15px;"></i> Click mic for voice input
+                    </div>
+                </div>
+
+                <!-- Results Card -->
+                <div class="card result-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-chart-line"></i> Conversion Result</h3>
+                        <div class="rate-badge" id="rateBadge">
+                            <i class="fas fa-calendar-alt"></i> 
+                        </div>
+                    </div>
+                    
+                    <div class="conversion-result">
+                        <div class="result-display">
+                            <div class="input-amount">
+                                <span id="displayAmount">1,000.00</span>
+                                <span class="currency" id="displayFromCurrency">USD</span>
+                            </div>
+                            
+                            <div class="equals">=</div>
+                            
+                            <div class="output-amount">
+                                <span id="convertedAmount">919.80</span>
+                                <span class="currency" id="displayToCurrency">EUR</span>
+                            </div>
+                        </div>
+                        
+                        <div class="exchange-rate">
+                            <i class="fas fa-exchange-alt"></i>
+                            1 <span id="rateFrom">USD</span> = 
+                            <span id="rateValue">0.9198</span> <span id="rateTo">EUR</span>
+                        </div>
+                        
+                        <div class="result-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar"></i>
+                                Date: <span id="resultTimestamp"></span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-database"></i>
+                                Rate: <span id="rateSource">ECB Official</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="convert-btn primary-btn" id="convertBtn">
+                        <i class="fas fa-sync-alt"></i> Calculate
+                    </button>
+                    
+                    <div class="result-actions">
+                        <button class="action-btn" id="copyResult" title="Copy result">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        <button class="action-btn" id="shareResult" title="Share">
+                            <i class="fas fa-share-alt"></i>
+                        </button>
+                        <button class="action-btn" id="saveConversion" title="Save">
+                            <i class="fas fa-bookmark"></i>
+                        </button>
+                        <button class="action-btn" id="chartView" title="View chart">
+                            <i class="fas fa-chart-bar"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Interaction Modes Card -->
+                <div class="card modes-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-gamepad"></i> Interaction Modes</h3>
+                        <div class="mode-indicator" id="currentModeIndicator">
+                            <i class="fas fa-circle"></i> <span>Mouse</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mode-selector">
+                        <div class="mode-options">
+                            <button class="mode-option active" data-mode="mouse">
+                                <div class="mode-icon">
+                                    <i class="fas fa-mouse-pointer"></i>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">Mouse & Touch</div>
+                                    <div class="mode-desc">Standard interface</div>
+                                </div>
+                            </button>
+                            
+                            <button class="mode-option" data-mode="voice">
+                                <div class="mode-icon">
+                                    <i class="fas fa-microphone"></i>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">Voice Control</div>
+                                    <div class="mode-desc">Hands-free operation</div>
+                                </div>
+                            </button>
+                            
+                            <button class="mode-option" data-mode="hand">
+                                <div class="mode-icon">
+                                    <i class="fas fa-hand-paper"></i>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">Hand Tracking</div>
+                                    <div class="mode-desc">Gesture controls</div>
+                                </div>
+                            </button>
+                            
+                            <button class="mode-option" data-mode="vr">
+                                <div class="mode-icon">
+                                    <i class="fas fa-vr-cardboard"></i>
+                                </div>
+                                <div class="mode-info">
+                                    <div class="mode-name">VR Mode</div>
+                                    <div class="mode-desc">Immersive experience</div>
+                                </div>
+                            </button>
+                        </div>
+                        
+                        <div class="mode-details" id="modeDetails">
+                            <div class="detail-header">
+                                <h4><i class="fas fa-info-circle"></i> Active Mode Details</h4>
+                            </div>
+                            <div class="detail-content">
+                                <p>Use mouse or touch to select currencies and amounts.</p>
+                                <ul class="mode-features">
+                                    <li><i class="fas fa-check"></i> Click on 3D globe markers</li>
+                                    <li><i class="fas fa-check"></i> Use quick selection buttons</li>
+                                    <li><i class="fas fa-check"></i> Drag to rotate 3D view</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mode-status">
+                        <div class="status-item" id="voiceStatus" style="display: none;">
+                            <i class="fas fa-circle"></i>
+                            <span>Voice: Ready</span>
+                        </div>
+                        <div class="status-item" id="handStatus" style="display: none;">
+                            <i class="fas fa-circle"></i>
+                            <span>Hand Tracking: Inactive</span>
+                        </div>
+                        <div class="status-item" id="vrStatus" style="display: none;">
+                            <i class="fas fa-circle"></i>
+                            <span>VR: Not connected</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- AR/VR Overlay -->
+        <div class="xr-overlay" id="xrOverlay">
+            <div class="xr-header">
+                <div class="xr-title">
+                    <i class="fas fa-cube"></i>
+                    <h3>Extended Reality Mode</h3>
+                </div>
+                <button class="xr-close" id="closeXR">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="xr-content">
+                <div class="xr-viewport">
+                    <video id="xrVideo" autoplay muted playsinline></video>
+                    <canvas id="xrCanvas"></canvas>
+                    
+                    <div class="xr-controls">
+                        <button class="xr-control-btn" id="toggleCamera">
+                            <i class="fas fa-camera"></i> Switch Camera
+                        </button>
+                        <button class="xr-control-btn" id="toggleHands">
+                            <i class="fas fa-hands"></i> Show Hands
+                        </button>
+                        <button class="xr-control-btn" id="captureXR">
+                            <i class="fas fa-camera-retro"></i> Capture
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="xr-instructions">
+                    <div class="instruction-section">
+                        <h4><i class="fas fa-gesture"></i> Hand Gestures</h4>
+                        <ul>
+                            <li><strong>✌️ Victory Sign</strong> - Convert current amount</li>
+                            <li><strong>👆 Pointing</strong> - Select currency on screen</li>
+                            <li><strong>✋ Open Palm</strong> - Show banknote recognition</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="instruction-section">
+                        <h4><i class="fas fa-volume-up"></i> Voice Commands</h4>
+                        <ul>
+                            <li>"Convert 1000 dollars to euros"</li>
+                            <li>"Select yen as target currency"</li>
+                            <li>"Set amount to five hundred"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Currency Selection Modal -->
+        <div class="modal" id="currencyModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3><i class="fas fa-flag"></i> Select Currency</h3>
+                    <button class="modal-close" id="closeModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="modal-body">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" id="currencySearch" placeholder="Search currency or country...">
+                    </div>
+                    
+                    <div class="currency-list" id="currencyList">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                </div>
+                
+                <div class="modal-footer">
+                    <button class="secondary-btn" id="cancelSelection">Cancel</button>
+                    <button class="primary-btn" id="confirmSelection">Select</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="main-footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-logo">
+                        <i class="fas fa-crystal-ball"></i>
+                        <span>Holo Converter</span>
+                    </div>
+                    <p class="footer-description">
+                        Advanced 3D currency converter with AR, VR, and hand tracking capabilities.
+                    </p>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Technologies</h4>
+                    <ul class="tech-list">
+                        <li>Three.js & WebGL</li>
+                        <li>Handtrack.js</li>
+                        <li>Web Speech API</li>
+                        <li>WebVR/WebXR</li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Data Sources</h4>
+                    <ul class="data-list">
+                        <li>European Central Bank (ECB)</li>
+                        <li>International Monetary Fund</li>
+                        <li>Bloomberg Financial Data</li>
+                    </ul>
+                </div>
+                
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul class="legal-links">
+                        <li><a href="#" id="privacyLink">Privacy Policy</a></li>
+                        <li><a href="#" id="termsLink">Terms of Service</a></li>
+                        <li><a href="#" id="cookiesLink">Cookie Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <div class="copyright">
+                    &copy; 2025 Holo Converter. All rights reserved.
+                    <span class="version"></span>
+                </div>
+                
+                <div class="footer-notes">
+                    <div class="note">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="note">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Rates are indicative only. Bank rates may vary.
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="js/main-fixed.js"></script>
+    <script src="js/globe-fixed.js"></script>
+    
+    <!-- Инициализация и расчеты -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Анимация загрузки
+            const progressBar = document.getElementById('loadingProgress');
+            let progress = 0;
+            
+            function updateProgress() {
+                progress += 2;
+                if (progress <= 100) {
+                    progressBar.style.width = progress + '%';
+                    setTimeout(updateProgress, 30);
+                }
+            }
+            
+            // Запускаем прогресс-бар сразу
+            setTimeout(updateProgress, 100);
+            
+            // 2. Устанавливаем правильный курс на сегодня
+            const usdToEurRate = getExchangeRate('USD', 'EUR');
+            const amount = 1000;
+            const converted = convertCurrency(amount, 'USD', 'EUR');
+            
+            // Обновляем отображение
+            document.getElementById('rateValue').textContent = usdToEurRate.toFixed(4);
+            document.getElementById('convertedAmount').textContent = converted.toFixed(2);
+            
+            // 3. Заполняем список изменений курсов 
+            const changesList = document.querySelector('.changes-list');
+            if (changesList) {
+                CURRENCY_CHANGES.forEach((currency, index) => {
+                    const changeItem = document.createElement('div');
+                    changeItem.className = 'change-item';
+                    changeItem.innerHTML = `
+                        <div class="change-info">
+                            <span class="change-flag">${currency.flag}</span>
+                            <span class="change-code">${currency.code}</span>
+                            <span class="change-name">${currency.name}</span>
+                        </div>
+                        <div class="change-values">
+                            <span class="change-rate">${currency.rate}</span>
+                            <span class="change-percent ${currency.direction}">
+                                <i class="fas fa-arrow-${currency.direction === 'up' ? 'up' : 'down'}"></i>
+                                ${currency.change}%
+                            </span>
+                        </div>
+                    `;
+                    changesList.appendChild(changeItem);
+                });
+            }
+            
+            // 4. Запускаем приложение после полной загрузки
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loadingScreen');
+                const appContainer = document.getElementById('appContainer');
+                
+                // Гарантируем, что прогресс-бар дошел до 100%
+                progressBar.style.width = '100%';
+                
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.style.transition = 'opacity 0.5s ease';
+                }
+                
+                setTimeout(() => {
+                    if (loadingScreen) loadingScreen.style.display = 'none';
+                    if (appContainer) {
+                        appContainer.style.display = 'flex';
+                        appContainer.style.animation = 'fadeIn 0.5s ease-out';
+                        
+                        // Запускаем глобус после показа контейнера
+                        setTimeout(() => {
+                            if (window.HoloGlobe && window.HoloGlobe.init) {
+                                window.HoloGlobe.init();
+                            }
+                        }, 300);
+                    }
+                }, 500);
+            }, 2000);
+        });
+        
+        // Функция для форматирования чисел
+        function formatNumber(num) {
+            return num.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+    </script>
+</body>
+</html>
