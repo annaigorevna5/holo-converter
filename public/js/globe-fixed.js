@@ -1,4 +1,4 @@
-console.log('🌍 ЗАПУСК ГЛОБУСА С МАРКЕРАМИ-ФЛАГАМИ');
+console.log('🌍 ЗАПУСК ГЛОБУСА С ИСПРАВЛЕННОЙ МОБИЛЬНОЙ ВЕРСИЕЙ');
 
 let scene, camera, renderer, controls, globe;
 let markers = [];
@@ -10,42 +10,25 @@ let selectedMarker = null;
 let isUserInteracting = false;
 let hoverTimeout = null;
 let tooltipVisible = false;
+let isDragging = false;
+let dragStartX = 0;
+let dragStartY = 0;
+
+// Флаг для определения мобильного устройства
+const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+console.log('📱 Мобильное устройство:', isMobile);
 
 // Цвета флагов для маркеров
 const flagColors = {
-    'USD': 0xff0000, // США - красный
-    'CAD': 0xff0000, // Канада - красный
-    'MXN': 0x006847, // Мексика - зеленый
-    'BRL': 0x009c3b, // Бразилия - зеленый
-    'ARS': 0x75aadb, // Аргентина - голубой
-    'CLP': 0xd52b1e, // Чили - красный
-    'EUR': 0x003399, // Еврозона - синий
-    'GBP': 0xc8102e, // Великобритания - красный
-    'CHF': 0xff0000, // Швейцария - красный
-    'RUB': 0xffffff, // Россия - белый
-    'SEK': 0x006aa7, // Швеция - синий
-    'NOK': 0xef2b2d, // Норвегия - красный
-    'DKK': 0xc60c30, // Дания - красный
-    'PLN': 0xdc143c, // Польша - красный
-    'CZK': 0x11457e, // Чехия - синий
-    'HUF': 0x436f4d, // Венгрия - зеленый
-    'JPY': 0xbc002d, // Япония - красный
-    'CNY': 0xde2910, // Китай - красный
-    'INR': 0xff9933, // Индия - оранжевый
-    'KRW': 0x003478, // Корея - синий
-    'SGD': 0xed2939, // Сингапур - красный
-    'AED': 0x009639, // ОАЭ - зеленый
-    'THB': 0xa51931, // Таиланд - красный
-    'TRY': 0xe30a17, // Турция - красный
-    'IDR': 0xff0000, // Индонезия - красный
-    'AUD': 0x00008b, // Австралия - синий
-    'NZD': 0x00247d, // Новая Зеландия - синий
-    'ZAR': 0x007a4d, // ЮАР - зеленый
-    'EGP': 0xce1126, // Египет - красный
-    'NGN': 0x008751, // Нигерия - зеленый
-    'KZT': 0x00afca, // Казахстан - голубой
-    'UAH': 0x0057b7, // Украина - синий
-    'BYN': 0xce1700  // Беларусь - красный
+    'USD': 0xff0000, 'CAD': 0xff0000, 'MXN': 0x006847, 'BRL': 0x009c3b,
+    'ARS': 0x75aadb, 'CLP': 0xd52b1e, 'EUR': 0x003399, 'GBP': 0xc8102e,
+    'CHF': 0xff0000, 'RUB': 0xffffff, 'SEK': 0x006aa7, 'NOK': 0xef2b2d,
+    'DKK': 0xc60c30, 'PLN': 0xdc143c, 'CZK': 0x11457e, 'HUF': 0x436f4d,
+    'JPY': 0xbc002d, 'CNY': 0xde2910, 'INR': 0xff9933, 'KRW': 0x003478,
+    'SGD': 0xed2939, 'AED': 0x009639, 'THB': 0xa51931, 'TRY': 0xe30a17,
+    'IDR': 0xff0000, 'AUD': 0x00008b, 'NZD': 0x00247d, 'ZAR': 0x007a4d,
+    'EGP': 0xce1126, 'NGN': 0x008751, 'KZT': 0x00afca, 'UAH': 0x0057b7,
+    'BYN': 0xce1700
 };
 
 // Список валют с координатами столиц
@@ -106,8 +89,12 @@ const exchangeRatesDemo = {
     UAH: 36.5, BYN: 3.25
 };
 
+// Хранилище для больших hitboxes на мобильных
+let mobileHitboxes = [];
+
 function initHoloGlobe() {
-    console.log('1. Инициализация глобуса с маркерами-флагами...');
+    console.log('1. Инициализация глобуса с исправленными маркерами...');
+    console.log('📱 Режим:', isMobile ? 'Мобильный' : 'Десктоп');
     
     const canvas = document.getElementById('globeCanvas');
     if (!canvas) {
@@ -118,6 +105,12 @@ function initHoloGlobe() {
     const container = canvas.parentElement;
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 500;
+    
+    // Очищаем предыдущие маркеры и хитбоксы
+    markers.forEach(marker => scene && scene.remove(marker));
+    mobileHitboxes.forEach(box => scene && scene.remove(box));
+    markers = [];
+    mobileHitboxes = [];
     
     // Scene
     scene = new THREE.Scene();
@@ -173,24 +166,15 @@ function initHoloGlobe() {
         controls.addEventListener('end', () => {
             isUserInteracting = false;
             setTimeout(() => {
-                if (!isUserInteracting) {
+                if (!isUserInteracting && !selectedMarker) {
                     controls.autoRotate = true;
                 }
             }, 2000);
         });
     }
     
-    // Взаимодействие
+    // Взаимодействие - ИСПРАВЛЕННАЯ ВЕРСИЯ ДЛЯ МОБИЛЬНЫХ
     setupInteractivity(canvas);
-    
-    // Легенда
-    createRegionalLegend();
-    
-    // Скрываем загрузку
-    setTimeout(() => {
-        const loading = document.getElementById('globeLoading');
-        if (loading) loading.style.display = 'none';
-    }, 1500);
     
     // Анимация
     function animate() {
@@ -211,7 +195,7 @@ function initHoloGlobe() {
 }
 
 function createEarth() {
-    const geometry = new THREE.SphereGeometry(1, 128, 128);
+    const geometry = new THREE.SphereGeometry(1, 64, 64); // Уменьшена детализация для производительности
     
     const textureLoader = new THREE.TextureLoader();
     const earthTexture = textureLoader.load(
@@ -243,26 +227,6 @@ function createFallbackTexture() {
     ctx.fillStyle = '#1a5fb4';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    const continents = [
-        { name: 'North America', color: '#2ecc71', points: [[200,100],[250,80],[300,90],[320,110],[310,140],[280,160],[240,170],[200,150],[180,130],[190,110]] },
-        { name: 'South America', color: '#27ae60', points: [[280,170],[300,200],[290,230],[260,240],[230,220],[220,190],[250,180]] },
-        { name: 'Europe', color: '#e74c3c', points: [[500,100],[520,110],[540,105],[560,115],[550,130],[530,140],[510,135],[500,120]] },
-        { name: 'Africa', color: '#f39c12', points: [[520,140],[560,150],[580,180],[570,210],[540,220],[520,200],[510,170],[520,140]] },
-        { name: 'Asia', color: '#d35400', points: [[600,80],[700,90],[750,110],[780,140],[770,180],[720,190],[680,170],[630,150],[610,120],[600,80]] },
-        { name: 'Australia', color: '#8e44ad', points: [[750,220],[780,230],[790,250],[770,260],[740,240],[740,220]] }
-    ];
-    
-    continents.forEach(continent => {
-        ctx.fillStyle = continent.color;
-        ctx.beginPath();
-        ctx.moveTo(continent.points[0][0], continent.points[0][1]);
-        for (let i = 1; i < continent.points.length; i++) {
-            ctx.lineTo(continent.points[i][0], continent.points[i][1]);
-        }
-        ctx.closePath();
-        ctx.fill();
-    });
-    
     const texture = new THREE.CanvasTexture(canvas);
     globe.material.map = texture;
     globe.material.needsUpdate = true;
@@ -282,7 +246,7 @@ function createInfoTooltip() {
         padding: 15px;
         color: white;
         font-family: 'Exo 2', sans-serif;
-        max-width: 300px;
+        max-width: 320px;
         min-width: 280px;
         backdrop-filter: blur(10px);
         z-index: 10000;
@@ -302,11 +266,11 @@ function showTooltip(x, y, content) {
     infoTooltip.innerHTML = content;
     tooltipVisible = true;
     
-    if (controls) {
+    if (controls && controls.autoRotate) {
         controls.autoRotate = false;
     }
     
-    const tooltipWidth = infoTooltip.offsetWidth || 300;
+    const tooltipWidth = 320; // Фиксированная ширина
     const tooltipHeight = infoTooltip.offsetHeight || 200;
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
@@ -314,6 +278,7 @@ function showTooltip(x, y, content) {
     let posX = x + 20;
     let posY = y - 10;
     
+    // Корректировка позиции, чтобы не выходить за границы экрана
     if (posX + tooltipWidth > windowWidth - 20) {
         posX = x - tooltipWidth - 20;
     }
@@ -334,9 +299,9 @@ function showTooltip(x, y, content) {
     infoTooltip.style.top = posY + 'px';
     infoTooltip.style.display = 'block';
     
-    setTimeout(() => {
+    requestAnimationFrame(() => {
         infoTooltip.style.opacity = '1';
-    }, 10);
+    });
 }
 
 function hideTooltip() {
@@ -349,9 +314,10 @@ function hideTooltip() {
         if (infoTooltip && !tooltipVisible) {
             infoTooltip.style.display = 'none';
             
-            if (controls && !isUserInteracting) {
+            // Возвращаем автоповорот только если нет выбранного маркера
+            if (controls && !selectedMarker) {
                 setTimeout(() => {
-                    if (!isUserInteracting && !tooltipVisible) {
+                    if (!selectedMarker && !tooltipVisible) {
                         controls.autoRotate = true;
                     }
                 }, 1000);
@@ -360,7 +326,6 @@ function hideTooltip() {
     }, 200);
 }
 
-// ФУНКЦИЯ СОЗДАНИЯ МАРКЕРОВ-ФЛАГОВ
 function createFlagMarkers() {
     console.log('Создаю маркеры-флаги...');
     
@@ -368,46 +333,73 @@ function createFlagMarkers() {
     markers = [];
     
     currencyData.forEach((curr, index) => {
+        const lat = curr.lat;
+        const lng = curr.lng;
+        
+        // Конвертация географических координат в 3D
+        const phi = (90 - lat) * (Math.PI / 180);  
+        const theta = (lng + 180) * (Math.PI / 180);  
+        const radius = 1.02;
+        const x = -radius * Math.sin(phi) * Math.cos(theta);
+        const y = radius * Math.cos(phi);
+        const z = radius * Math.sin(phi) * Math.sin(theta);
+        
+        // Создаем маркер с флагом
+        const marker = createCountryFlagMarker(x, y, z, curr.code);
+        
+        const color = flagColors[curr.code] || 0x00aaff;
+        
+        marker.userData = {
+            type: 'currency',
+            code: curr.code,
+            flag: curr.flag,
+            country: curr.country,
+            name: curr.name,
+            city: curr.city,
+            region: curr.region,
+            color: color,
+            originalColor: color,
+            exchangeRate: exchangeRatesDemo[curr.code] || 1,
+            isHovered: false,
+            isSelected: false,
+            position: new THREE.Vector3(x, y, z)
+        };
+        
+        scene.add(marker);
+        markers.push(marker);
+        
+        // Создаем большой невидимый хитбокс для мобильных устройств
+        if (isMobile) {
+            createMobileHitbox(marker, x, y, z);
+        }
+        
+        // Анимация появления с задержкой
         setTimeout(() => {
-            const lat = curr.lat;
-            const lng = curr.lng;
-            
-            // Конвертация географических координат в 3D
-            const phi = (90 - lat) * (Math.PI / 180);  
-            const theta = (lng + 180) * (Math.PI / 180);  
-            const radius = 1.02;
-            const x = -radius * Math.sin(phi) * Math.cos(theta);
-            const y = radius * Math.cos(phi);
-            const z = radius * Math.sin(phi) * Math.sin(theta);
-            
-            // Создаем маркер с флагом
-            const marker = createCountryFlagMarker(x, y, z, curr.code);
-            
-            const color = flagColors[curr.code] || 0x00aaff;
-            
-            marker.userData = {
-                type: 'currency',
-                code: curr.code,
-                flag: curr.flag,
-                country: curr.country,
-                name: curr.name,
-                city: curr.city,
-                region: curr.region,
-                color: color,
-                originalColor: color,
-                exchangeRate: exchangeRatesDemo[curr.code] || 1,
-                isHovered: false,
-                isSelected: false
-            };
-            
-            scene.add(marker);
-            markers.push(marker);
-            
-            // Анимация появления
             animateMarkerAppearance(marker);
-            
         }, index * 30);
     });
+}
+
+function createMobileHitbox(marker, x, y, z) {
+    // Создаем большую невидимую сферу для лучшего тапа
+    const hitboxGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+    const hitboxMaterial = new THREE.MeshBasicMaterial({
+        visible: false,
+        transparent: true,
+        opacity: 0
+    });
+    
+    const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
+    hitbox.position.set(x, y, z);
+    hitbox.userData = {
+        type: 'hitbox',
+        marker: marker,
+        code: marker.userData.code
+    };
+    
+    scene.add(hitbox);
+    mobileHitboxes.push(hitbox);
+    marker.userData.hitbox = hitbox;
 }
 
 function createCountryFlagMarker(x, y, z, currencyCode) {
@@ -416,21 +408,8 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     
     const color = flagColors[currencyCode] || 0x00aaff;
     
-    // 1. Основание флага 
-    const flagBaseGeometry = new THREE.BoxGeometry(0.06, 0.04, 0.01);
-    const flagBaseMaterial = new THREE.MeshPhongMaterial({
-        color: color,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 30
-    });
-    
-    const flagBase = new THREE.Mesh(flagBaseGeometry, flagBaseMaterial);
-    flagBase.position.y = 0.02;
-    group.add(flagBase);
-    
-    // 2. Флагшток 
-    const poleGeometry = new THREE.CylinderGeometry(0.003, 0.005, 0.1, 8);
+    // 1. Флагшток
+    const poleGeometry = new THREE.CylinderGeometry(0.003, 0.005, 0.08, 6);
     const poleMaterial = new THREE.MeshBasicMaterial({
         color: 0x888888,
         transparent: true,
@@ -438,11 +417,25 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     });
     
     const pole = new THREE.Mesh(poleGeometry, poleMaterial);
-    pole.position.y = -0.05;
-    pole.rotation.x = Math.PI;
+    pole.position.y = -0.04;
     group.add(pole);
     
-    // 3. Код валюты 
+    // 2. Основание флага
+    const flagGeometry = new THREE.BoxGeometry(0.06, 0.04, 0.01);
+    const flagMaterial = new THREE.MeshPhongMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.9,
+        shininess: 30,
+        emissive: new THREE.Color(color),
+        emissiveIntensity: 0
+    });
+    
+    const flag = new THREE.Mesh(flagGeometry, flagMaterial);
+    flag.position.y = 0.02;
+    group.add(flag);
+    
+    // 3. Код валюты
     const textCanvas = document.createElement('canvas');
     textCanvas.width = 64;
     textCanvas.height = 32;
@@ -467,8 +460,8 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     text.position.set(0, 0.02, 0.006);
     group.add(text);
     
-    // 4. Подсветка флага
-    const glowGeometry = new THREE.SphereGeometry(0.035, 16, 16);
+    // 4. Свечение
+    const glowGeometry = new THREE.SphereGeometry(0.04, 12, 12);
     const glowMaterial = new THREE.MeshBasicMaterial({
         color: color,
         transparent: true,
@@ -480,8 +473,8 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     glow.position.y = 0.02;
     group.add(glow);
     
-    // 5. Основание маркера
-    const baseGeometry = new THREE.CylinderGeometry(0.008, 0.01, 0.02, 8);
+    // 5. Основание
+    const baseGeometry = new THREE.CylinderGeometry(0.008, 0.01, 0.02, 6);
     const baseMaterial = new THREE.MeshBasicMaterial({
         color: 0x666666,
         transparent: true,
@@ -489,7 +482,7 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     });
     
     const base = new THREE.Mesh(baseGeometry, baseMaterial);
-    base.position.y = -0.09;
+    base.position.y = -0.08;
     group.add(base);
     
     // Направляем маркер от центра Земли
@@ -499,7 +492,7 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
     
     // Сохраняем ссылки
     group.markerParts = {
-        flag: flagBase,
+        flag: flag,
         pole: pole,
         text: text,
         glow: glow,
@@ -510,71 +503,380 @@ function createCountryFlagMarker(x, y, z, currencyCode) {
 }
 
 function animateMarkerAppearance(marker) {
-    marker.scale.set(0, 0, 0);
+    const startScale = 0;
+    const endScale = 1;
+    const duration = 300;
+    const startTime = Date.now();
     
-    let scale = 0;
-    const appearInterval = setInterval(() => {
-        scale += 0.2;
+    function animate() {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const scale = startScale + (endScale - startScale) * progress;
+        
         marker.scale.set(scale, scale, scale);
         
-        if (scale >= 1) {
-            clearInterval(appearInterval);
-            marker.scale.set(1, 1, 1);
+        if (progress < 1) {
+            requestAnimationFrame(animate);
         }
-    }, 20);
+    }
+    
+    animate();
 }
 
 function animateMarkers() {
     const time = Date.now() * 0.001;
     
     markers.forEach(marker => {
-        if (marker.userData.isHovered && marker.markerParts) {
-            // Плавное покачивание флага при наведении
-            const wave = Math.sin(time * 8) * 0.05;
-            marker.markerParts.flag.rotation.z = wave;
-            
-            // Пульсация свечения
-            const pulse = Math.sin(time * 10) * 0.1 + 0.3;
+        if (marker.markerParts) {
+            // Очень легкая общая пульсация
             if (marker.markerParts.glow) {
-                marker.markerParts.glow.material.opacity = pulse;
+                const gentlePulse = Math.sin(time * 0.3 + marker.userData.code.length) * 0.05 + 0.15;
+                marker.markerParts.glow.material.opacity = gentlePulse;
             }
             
-            // Легкое вращение
-            marker.rotation.y += 0.005;
-        }
-        
-        // Очень легкая общая пульсация
-        if (marker.markerParts && marker.markerParts.glow && !marker.userData.isHovered && !marker.userData.isSelected) {
-            const gentlePulse = Math.sin(time * 0.3 + marker.userData.code.length) * 0.05 + 0.2;
-            marker.markerParts.glow.material.opacity = gentlePulse;
+            // Анимация при наведении
+            if (marker.userData.isHovered) {
+                const wave = Math.sin(time * 8) * 0.03;
+                if (marker.markerParts.flag) {
+                    marker.markerParts.flag.rotation.z = wave;
+                }
+                
+                if (marker.markerParts.glow) {
+                    marker.markerParts.glow.material.opacity = 0.3;
+                }
+            }
         }
     });
 }
 
+// ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЛЯ НАСТРОЙКИ ИНТЕРАКТИВНОСТИ
 function setupInteractivity(canvas) {
-    console.log('Настраиваю интерактивность...');
+    console.log('Настраиваю интерактивность для', isMobile ? 'мобильных устройств' : 'десктопа');
     
+    let lastTouchTime = 0;
     let lastHoverTime = 0;
-    const hoverDelay = 200;
+    const hoverDelay = isMobile ? 100 : 200;
+    let tapCount = 0;
+    let lastTapTime = 0;
+    const doubleTapDelay = 300;
+    let isTouchMoving = false;
     
-    canvas.addEventListener('mousemove', (event) => {
-        if (isUserInteracting) return;
-        
+    // Очищаем предыдущие события
+    canvas.removeEventListener('touchstart', handleTouchStart);
+    canvas.removeEventListener('touchmove', handleTouchMove);
+    canvas.removeEventListener('touchend', handleTouchEnd);
+    canvas.removeEventListener('mousemove', handleMouseMove);
+    canvas.removeEventListener('click', handleMouseClick);
+    canvas.removeEventListener('mouseleave', handleMouseLeave);
+    
+    // Общая функция для получения координат события
+    function getEventPosition(event) {
         const rect = canvas.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+        let clientX, clientY;
+        
+        if (event.type.includes('touch')) {
+            if (event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            } else if (event.changedTouches.length > 0) {
+                clientX = event.changedTouches[0].clientX;
+                clientY = event.changedTouches[0].clientY;
+            } else {
+                return null;
+            }
+        } else {
+            clientX = event.clientX;
+            clientY = event.clientY;
+        }
+        
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        
+        return { clientX, clientY };
+    }
+    
+    // Функция для поиска пересечений с оптимизацией
+    function findIntersects(clientX, clientY) {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
         
         raycaster.setFromCamera(mouse, camera);
         
-        const allObjects = [];
-        markers.forEach(marker => {
-            allObjects.push(marker);
-            marker.children.forEach(child => {
-                allObjects.push(child);
-            });
-        });
+        // Для лучшей производительности проверяем только маркеры и хитбоксы
+        const allObjects = [...markers, ...mobileHitboxes];
+        return raycaster.intersectObjects(allObjects, false);
+    }
+    
+    // Функция получения маркера из объекта пересечения
+    function getMarkerFromObject(object) {
+        if (!object) return null;
         
-        const intersects = raycaster.intersectObjects(allObjects, true);
+        // Если это хитбокс, возвращаем связанный маркер
+        if (object.userData.type === 'hitbox') {
+            return object.userData.marker;
+        }
+        
+        // Если это сам маркер
+        if (object.userData.type === 'currency') {
+            return object;
+        }
+        
+        // Ищем родительский маркер
+        let current = object.parent;
+        while (current) {
+            if (current.userData && current.userData.type === 'currency') {
+                return current;
+            }
+            current = current.parent;
+        }
+        
+        return null;
+    }
+    
+    // Обработка одиночного тапа/клика
+    function handleSingleTap(marker, clientX, clientY) {
+        // Снимаем выделение с предыдущего маркера
+        if (selectedMarker && selectedMarker !== marker) {
+            resetMarkerSelection(selectedMarker);
+        }
+        
+        // Выделяем новый маркер
+        if (selectedMarker !== marker) {
+            setMarkerSelected(marker);
+            selectedMarker = marker;
+            
+            if (controls) {
+                controls.autoRotate = false;
+            }
+            
+            selectCurrency(marker.userData);
+            showCurrencyTooltip(clientX, clientY, marker.userData, true);
+            
+            // На мобильных скрываем тултип через 4 секунды
+            if (isMobile) {
+                setTimeout(() => {
+                    if (selectedMarker === marker) {
+                        hideTooltip();
+                    }
+                }, 4000);
+            }
+        } else {
+            // Повторный клик на тот же маркер - снимаем выделение
+            resetMarkerSelection(marker);
+            selectedMarker = null;
+            hideTooltip();
+            
+            if (controls && !isUserInteracting) {
+                setTimeout(() => {
+                    controls.autoRotate = true;
+                }, 1000);
+            }
+        }
+    }
+    
+    // Обработка двойного тапа
+    function handleDoubleTap(marker) {
+        console.log('Двойной тап на маркер:', marker.userData.code);
+        
+        // Приближение к маркеру
+        if (controls) {
+            const markerPosition = marker.userData.position.clone();
+            const lookAtPosition = markerPosition.clone().multiplyScalar(0.8);
+            
+            const startTarget = controls.target.clone();
+            const startPosition = camera.position.clone();
+            
+            const duration = 600;
+            const startTime = Date.now();
+            
+            function animateCamera() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                const easeProgress = 1 - Math.pow(1 - progress, 3);
+                
+                controls.target.lerpVectors(startTarget, lookAtPosition, easeProgress);
+                camera.position.lerpVectors(startPosition, 
+                    new THREE.Vector3(
+                        lookAtPosition.x * 1.5,
+                        lookAtPosition.y + 0.3,
+                        lookAtPosition.z * 1.5 + 1.8
+                    ), 
+                    easeProgress
+                );
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateCamera);
+                }
+            }
+            
+            animateCamera();
+        }
+    }
+    
+    // Touch события
+    function handleTouchStart(event) {
+        event.preventDefault();
+        
+        isTouchMoving = false;
+        const pos = getEventPosition(event);
+        if (!pos) return;
+        
+        // Проверяем, есть ли пересечение с маркером
+        const intersects = findIntersects(pos.clientX, pos.clientY);
+        
+        if (intersects.length > 0) {
+            const marker = getMarkerFromObject(intersects[0].object);
+            if (marker) {
+                // Предотвращаем вращение при тапе на маркер
+                isUserInteracting = true;
+                if (controls) {
+                    controls.enabled = false;
+                }
+                
+                // Устанавливаем наведение
+                if (hoveredMarker && hoveredMarker !== marker) {
+                    resetMarkerHover(hoveredMarker);
+                }
+                setMarkerHover(marker);
+                hoveredMarker = marker;
+                
+                // Показываем краткий тултип на мобильных
+                showMobileTooltip(pos.clientX, pos.clientY, marker.userData);
+            } else {
+                // Тап не на маркер - разрешаем вращение
+                if (controls) {
+                    controls.enabled = true;
+                }
+                isUserInteracting = true;
+            }
+        } else {
+            // Тап не на маркер - разрешаем вращение
+            if (controls) {
+                controls.enabled = true;
+            }
+            isUserInteracting = true;
+        }
+        
+        dragStartX = pos.clientX;
+        dragStartY = pos.clientY;
+        
+        // Обработка двойного тапа
+        const currentTime = Date.now();
+        const timeDiff = currentTime - lastTapTime;
+        
+        if (tapCount === 0 || timeDiff > doubleTapDelay) {
+            tapCount = 1;
+        } else if (timeDiff <= doubleTapDelay) {
+            tapCount = 2;
+        }
+        
+        lastTapTime = currentTime;
+    }
+    
+    function handleTouchMove(event) {
+        event.preventDefault();
+        
+        if (!isUserInteracting) return;
+        
+        const pos = getEventPosition(event);
+        if (!pos) return;
+        
+        // Определяем, было ли движение (для отличия тапа от свайпа)
+        const dx = Math.abs(pos.clientX - dragStartX);
+        const dy = Math.abs(pos.clientY - dragStartY);
+        
+        if (dx > 5 || dy > 5) {
+            isTouchMoving = true;
+            hideTooltip();
+            
+            if (hoveredMarker) {
+                resetMarkerHover(hoveredMarker);
+                hoveredMarker = null;
+            }
+        }
+        
+        // Если вращение разрешено
+        if (controls && controls.enabled) {
+            controls.enabled = true;
+        }
+    }
+    
+    function handleTouchEnd(event) {
+        event.preventDefault();
+        
+        const pos = getEventPosition(event);
+        if (!pos) return;
+        
+        // Если было движение, не обрабатываем как тап
+        if (isTouchMoving) {
+            isTouchMoving = false;
+            setTimeout(() => {
+                isUserInteracting = false;
+                if (controls && !selectedMarker) {
+                    controls.enabled = true;
+                    setTimeout(() => {
+                        if (!isUserInteracting) {
+                            controls.autoRotate = true;
+                        }
+                    }, 2000);
+                }
+            }, 100);
+            return;
+        }
+        
+        // Находим маркер под пальцем
+        const intersects = findIntersects(pos.clientX, pos.clientY);
+        
+        if (intersects.length > 0) {
+            const marker = getMarkerFromObject(intersects[0].object);
+            if (marker) {
+                // Обработка двойного тапа
+                if (tapCount === 2) {
+                    handleDoubleTap(marker);
+                    tapCount = 0;
+                } else {
+                    // Одиночный тап
+                    setTimeout(() => {
+                        if (tapCount === 1) {
+                            handleSingleTap(marker, pos.clientX, pos.clientY);
+                            tapCount = 0;
+                        }
+                    }, doubleTapDelay);
+                }
+            }
+        } else {
+            // Тап вне маркера
+            if (selectedMarker) {
+                resetMarkerSelection(selectedMarker);
+                selectedMarker = null;
+                hideTooltip();
+            }
+        }
+        
+        // Включаем автоповорот если нет выбранного маркера
+        setTimeout(() => {
+            isUserInteracting = false;
+            if (controls && !selectedMarker) {
+                controls.enabled = true;
+                setTimeout(() => {
+                    if (!isUserInteracting && !selectedMarker) {
+                        controls.autoRotate = true;
+                    }
+                }, 2000);
+            }
+        }, 200);
+    }
+    
+    // Mouse события
+    function handleMouseMove(event) {
+        if (isUserInteracting) return;
+        
+        const pos = getEventPosition(event);
+        if (!pos) return;
+        
+        const intersects = findIntersects(pos.clientX, pos.clientY);
         
         if (hoverTimeout) {
             clearTimeout(hoverTimeout);
@@ -585,6 +887,7 @@ function setupInteractivity(canvas) {
             resetMarkerHover(hoveredMarker);
             hoveredMarker = null;
             hideTooltip();
+            canvas.style.cursor = 'grab';
         }
         
         if (intersects.length > 0) {
@@ -600,119 +903,144 @@ function setupInteractivity(canvas) {
                 
                 hoverTimeout = setTimeout(() => {
                     if (lastHoverTime === now && hoveredMarker === newHoveredMarker && !isUserInteracting) {
-                        showCurrencyTooltip(event.clientX, event.clientY, hoveredMarker.userData);
+                        showCurrencyTooltip(pos.clientX, pos.clientY, hoveredMarker.userData, false);
                     }
                 }, hoverDelay);
             }
         } else {
-            canvas.style.cursor = 'default';
+            canvas.style.cursor = 'grab';
         }
-    });
+    }
     
-    canvas.addEventListener('mouseleave', () => {
+    function handleMouseClick(event) {
+        if (isUserInteracting) return;
+        
+        const pos = getEventPosition(event);
+        if (!pos) return;
+        
+        const intersects = findIntersects(pos.clientX, pos.clientY);
+        
+        if (intersects.length > 0) {
+            const marker = getMarkerFromObject(intersects[0].object);
+            if (marker) {
+                handleSingleTap(marker, pos.clientX, pos.clientY);
+            }
+        } else {
+            // Клик вне маркера
+            if (selectedMarker) {
+                resetMarkerSelection(selectedMarker);
+                selectedMarker = null;
+                hideTooltip();
+                
+                if (controls && !isUserInteracting) {
+                    setTimeout(() => {
+                        controls.autoRotate = true;
+                    }, 1000);
+                }
+            }
+        }
+    }
+    
+    function handleMouseLeave() {
         if (hoveredMarker) {
             resetMarkerHover(hoveredMarker);
             hoveredMarker = null;
         }
         hideTooltip();
-        canvas.style.cursor = 'default';
+        canvas.style.cursor = 'grab';
         
         if (hoverTimeout) {
             clearTimeout(hoverTimeout);
             hoverTimeout = null;
         }
-    });
+    }
     
-    // Клик по маркеру
-    canvas.addEventListener('click', (event) => {
-        if (isUserInteracting) return;
+    // Назначаем события в зависимости от устройства
+    if (isMobile) {
+        console.log('📱 Использую touch события для мобильного');
         
-        if (!hoveredMarker) return;
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
         
-        if (selectedMarker && selectedMarker !== hoveredMarker) {
-            resetMarkerSelection(selectedMarker);
-        }
+        // Предотвращаем контекстное меню
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         
-        setMarkerSelected(hoveredMarker);
-        selectedMarker = hoveredMarker;
+    } else {
+        console.log('🖱️ Использую mouse события для десктопа');
         
-        if (controls) {
-            controls.autoRotate = false;
-            isUserInteracting = true;
-        }
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', handleMouseClick);
+        canvas.addEventListener('mouseleave', handleMouseLeave);
         
-        selectCurrency(hoveredMarker.userData);
-        
-        showCurrencyTooltip(event.clientX, event.clientY, hoveredMarker.userData, true);
-    });
-    
-    canvas.addEventListener('mousedown', (event) => {
-        if (event.button !== 0) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        
-        raycaster.setFromCamera(mouse, camera);
-        
-        const allObjects = [];
-        markers.forEach(marker => {
-            allObjects.push(marker);
-            marker.children.forEach(child => {
-                allObjects.push(child);
-            });
+        canvas.addEventListener('mousedown', (event) => {
+            if (event.button === 0) {
+                isUserInteracting = true;
+                canvas.style.cursor = 'grabbing';
+            }
         });
         
-        const intersects = raycaster.intersectObjects(allObjects, true);
-        
-        if (!intersects.length && selectedMarker) {
-            resetMarkerSelection(selectedMarker);
-            selectedMarker = null;
-            hideTooltip();
-            
-            if (controls) {
-                setTimeout(() => {
-                    if (!isUserInteracting) {
-                        controls.autoRotate = true;
-                    }
-                }, 2000);
+        canvas.addEventListener('mouseup', (event) => {
+            if (event.button === 0) {
+                isUserInteracting = false;
+                canvas.style.cursor = 'grab';
             }
-        }
-    });
+        });
+    }
+    
+    // Инициализируем курсор
+    canvas.style.cursor = isMobile ? 'default' : 'grab';
 }
 
-function getMarkerFromObject(object) {
-    let current = object;
-    while (current && !current.userData.type) {
-        current = current.parent;
-    }
-    return current && current.userData.type === 'currency' ? current : null;
+function showMobileTooltip(x, y, currencyData) {
+    const content = `
+        <div style="min-width: 250px; padding: 15px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+                <div style="font-size: 2rem;">${currencyData.flag}</div>
+                <div>
+                    <div style="font-size: 1.4rem; font-weight: bold; color: #00ccff;">
+                        ${currencyData.code}
+                    </div>
+                    <div style="font-size: 0.9rem; color: #a0a0ff;">
+                        ${currencyData.name}
+                    </div>
+                </div>
+            </div>
+            <div style="background: rgba(0,170,255,0.1); border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                <div style="color: #ffffff; font-size: 1rem; margin-bottom: 5px;">
+                    ${currencyData.country}
+                </div>
+                <div style="color: #a0a0ff; font-size: 0.9rem;">
+                    ${currencyData.region}
+                </div>
+            </div>
+            <div style="color: #00ffaa; font-size: 0.9rem; text-align: center; padding: 8px; background: rgba(0,255,170,0.1); border-radius: 6px; margin-bottom: 10px;">
+                <i class="fas fa-hand-point-up"></i> Тапните для выбора
+            </div>
+            <div style="color: #8888cc; font-size: 0.8rem; text-align: center; padding: 8px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <i class="fas fa-expand-alt"></i> Двойной тап для приближения
+            </div>
+        </div>
+    `;
+    
+    showTooltip(x, y, content);
 }
 
 function setMarkerHover(marker) {
-    if (!marker || marker.userData.isHovered) return;
+    if (!marker || marker.userData.isHovered || marker.userData.isSelected) return;
     
     marker.userData.isHovered = true;
     
-    // Увеличение маркера при наведении
-    marker.scale.set(1.4, 1.4, 1.4);
+    // Легкое увеличение
+    marker.scale.set(1.2, 1.2, 1.2);
     
     if (marker.markerParts) {
-        // Подсветка флага
         if (marker.markerParts.flag) {
-            marker.markerParts.flag.material.emissive = new THREE.Color(marker.userData.color);
-            marker.markerParts.flag.material.emissiveIntensity = 0.3;
-            marker.markerParts.flag.material.opacity = 1;
+            marker.markerParts.flag.material.emissiveIntensity = 0.2;
         }
         
-        // Усиление свечения
         if (marker.markerParts.glow) {
-            marker.markerParts.glow.material.opacity = 0.4;
-        }
-        
-        // Подсветка текста
-        if (marker.markerParts.text) {
-            marker.markerParts.text.material.opacity = 1;
+            marker.markerParts.glow.material.opacity = 0.3;
         }
     }
 }
@@ -729,57 +1057,59 @@ function resetMarkerHover(marker) {
     if (marker.markerParts) {
         if (marker.markerParts.flag) {
             marker.markerParts.flag.material.emissiveIntensity = 0;
-            marker.markerParts.flag.material.opacity = 0.9;
-            marker.markerParts.flag.rotation.z = 0;
         }
         
         if (marker.markerParts.glow) {
-            marker.markerParts.glow.material.opacity = 0.2;
-        }
-        
-        if (marker.markerParts.text) {
-            marker.markerParts.text.material.opacity = 0.9;
+            marker.markerParts.glow.material.opacity = 0.15;
         }
     }
 }
 
 function setMarkerSelected(marker) {
-    if (!marker) return;
+    if (!marker || marker.userData.isSelected) return;
+    
+    // Снимаем выделение с предыдущего маркера
+    if (selectedMarker && selectedMarker !== marker) {
+        resetMarkerSelection(selectedMarker);
+    }
     
     marker.userData.isSelected = true;
+    marker.userData.isHovered = false;
     
-    // Выделение выбранного маркера
-    marker.scale.set(1.5, 1.5, 1.5);
+    // Выделение
+    marker.scale.set(1.3, 1.3, 1.3);
     
     if (marker.markerParts) {
         if (marker.markerParts.flag) {
             marker.markerParts.flag.material.color.set(0x00ffaa);
-            marker.markerParts.flag.material.emissive = new THREE.Color(0x00ffaa);
-            marker.markerParts.flag.material.emissiveIntensity = 0.5;
-            marker.markerParts.flag.material.opacity = 1;
+            marker.markerParts.flag.material.emissive.set(0x00ffaa);
+            marker.markerParts.flag.material.emissiveIntensity = 0.4;
         }
         
         if (marker.markerParts.glow) {
             marker.markerParts.glow.material.color.set(0x00ffaa);
-            marker.markerParts.glow.material.opacity = 0.3;
+            marker.markerParts.glow.material.opacity = 0.25;
         }
     }
     
     // Анимация пульсации
-    let scale = 1.5;
-    let direction = -0.015;
+    let scale = 1.3;
+    let direction = 0.01;
+    const minScale = 1.25;
+    const maxScale = 1.35;
+    
     if (marker.pulseInterval) clearInterval(marker.pulseInterval);
     
     marker.pulseInterval = setInterval(() => {
         scale += direction;
-        if (scale <= 1.45) direction = 0.015;
-        if (scale >= 1.55) direction = -0.015;
+        if (scale <= minScale) direction = 0.01;
+        if (scale >= maxScale) direction = -0.01;
         marker.scale.set(scale, scale, scale);
-    }, 60);
+    }, 50);
 }
 
 function resetMarkerSelection(marker) {
-    if (!marker) return;
+    if (!marker || !marker.userData.isSelected) return;
     
     marker.userData.isSelected = false;
     
@@ -788,22 +1118,17 @@ function resetMarkerSelection(marker) {
         delete marker.pulseInterval;
     }
     
-    if (marker.userData.isHovered) {
-        marker.scale.set(1.4, 1.4, 1.4);
-    } else {
-        marker.scale.set(1, 1, 1);
-    }
+    marker.scale.set(1, 1, 1);
     
     if (marker.markerParts) {
         if (marker.markerParts.flag) {
             marker.markerParts.flag.material.color.set(marker.userData.originalColor);
-            marker.markerParts.flag.material.emissiveIntensity = marker.userData.isHovered ? 0.3 : 0;
-            marker.markerParts.flag.material.opacity = marker.userData.isHovered ? 1 : 0.9;
+            marker.markerParts.flag.material.emissiveIntensity = 0;
         }
         
         if (marker.markerParts.glow) {
             marker.markerParts.glow.material.color.set(marker.userData.originalColor);
-            marker.markerParts.glow.material.opacity = marker.userData.isHovered ? 0.4 : 0.2;
+            marker.markerParts.glow.material.opacity = 0.15;
         }
     }
 }
@@ -875,12 +1200,12 @@ function showCurrencyTooltip(x, y, currencyData, isClick = false) {
     
     showTooltip(x, y, content);
     
-    if (isClick) {
+    if (isClick && isMobile) {
         setTimeout(() => {
-            if (selectedMarker === hoveredMarker) {
+            if (selectedMarker && selectedMarker.userData.code === currencyData.code) {
                 hideTooltip();
             }
-        }, 5000);
+        }, 4000);
     }
 }
 
@@ -908,277 +1233,60 @@ function updateCurrencyDisplay(currency) {
         if (code) code.textContent = currency.code;
         if (name) name.textContent = `${currency.name} (${currency.country})`;
         if (input) input.value = currency.code;
+        
+        // Обновляем символ валюты
+        const symbol = document.getElementById('inputCurrencySymbol');
+        if (symbol && window.HoloApp && window.HoloApp.getCurrencySymbol) {
+            const fromCurrency = document.getElementById('fromCurrency')?.value || 'USD';
+            symbol.textContent = window.HoloApp.getCurrencySymbol(fromCurrency);
+        }
     }
-}
-
-function createRegionalLegend() {
-    const container = document.querySelector('.globe-container');
-    if (!container) return;
     
-    const oldLegend = document.getElementById('legend');
-    if (oldLegend) oldLegend.remove();
-    
-    const oldToggle = document.querySelector('.globe-legend-toggle');
-    if (oldToggle) oldToggle.remove();
-    
-    const toggleBtn = document.createElement('button');
-    toggleBtn.id = 'legendToggle';
-    toggleBtn.className = 'globe-legend-toggle';
-    toggleBtn.innerHTML = '<i class="fas fa-layer-group"></i>';
-    toggleBtn.title = 'Показать/скрыть легенду валют';
-    
-    const legend = document.createElement('div');
-    legend.id = 'legend';
-    legend.className = 'globe-legend';
-    legend.style.cssText = `
-        position: absolute;
-        top: 80px;
-        left: 20px;
-        background: rgba(10, 15, 40, 0.98);
-        border: 2px solid #00aaff;
-        border-radius: 15px;
-        padding: 20px;
-        color: white;
-        width: 350px;
-        max-height: 500px;
-        overflow-y: auto;
-        backdrop-filter: blur(15px);
-        z-index: 99;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
-        display: none;
-    `;
-    
-    container.appendChild(toggleBtn);
-    container.appendChild(legend);
-    
-    toggleBtn.addEventListener('click', () => {
-        const isVisible = legend.style.display === 'block';
-        legend.style.display = isVisible ? 'none' : 'block';
-        
-        if (!isVisible) {
-            updateRegionalLegendContent();
-        }
-    });
-    
-    updateRegionalLegendContent();
-}
-
-function updateRegionalLegendContent() {
-    const legend = document.getElementById('legend');
-    if (!legend) return;
-    
-    const regions = {};
-    currencyData.forEach(currency => {
-        if (!regions[currency.region]) {
-            regions[currency.region] = [];
-        }
-        regions[currency.region].push(currency);
-    });
-    
-    let legendHTML = `
-        <div style="margin-bottom: 20px;">
-            <h4 style="margin:0 0 15px 0;color:#00ccff;border-bottom:1px solid rgba(0,170,255,0.3);padding-bottom:10px;">
-                <i class="fas fa-globe-americas"></i> Валюты по регионам
-            </h4>
-            <div style="font-size: 0.9rem; color: #a0a0ff; margin-bottom: 15px;">
-                <i class="fas fa-lightbulb"></i> Наведите на флаг для информации<br>
-                <i class="fas fa-mouse-pointer"></i> Кликните для выбора валюты
-            </div>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px;">
-                <div style="background: rgba(0,170,255,0.2); padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">
-                    <i class="fas fa-coins"></i> ${currencyData.length} валют
-                </div>
-                <div style="background: rgba(0,255,170,0.2); padding: 4px 8px; border-radius: 12px; font-size: 0.8rem;">
-                    <i class="fas fa-globe"></i> ${Object.keys(regions).length} регионов
-                </div>
-            </div>
-        </div>
-        
-        <div style="max-height: 380px; overflow-y: auto; padding-right: 5px;">
-    `;
-    
-    Object.keys(regions).forEach(region => {
-        const regionCurrencies = regions[region];
-        const regionColor = getRegionColor(region);
-        
-        legendHTML += `
-            <div class="region-section" style="margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(0,170,255,0.2);">
-                    <div style="width: 12px; height: 12px; background: ${regionColor}; border-radius: 50%; margin-right: 10px;"></div>
-                    <div style="font-weight: bold; color: #00ccff; font-size: 1.1rem;">${region}</div>
-                    <div style="margin-left: auto; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 10px; font-size: 0.8rem;">
-                        ${regionCurrencies.length} валют
-                    </div>
-                </div>
-                
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-                    ${regionCurrencies.map(currency => `
-                        <div class="legend-currency" 
-                             data-currency="${currency.code}"
-                             style="display: flex; align-items: center; padding: 8px;
-                                    background: rgba(255, 255, 255, 0.05); border-radius: 6px; cursor: pointer;
-                                    transition: all 0.3s; border-left: 3px solid #${(flagColors[currency.code] || 0x00aaff).toString(16)};">
-                            <div style="font-size: 1.2rem; margin-right: 10px; width: 30px; text-align: center;">
-                                ${currency.flag}
-                            </div>
-                            <div style="flex: 1;">
-                                <div style="font-weight: bold; color: #ffffff; font-size: 0.95rem;">
-                                    ${currency.code}
-                                </div>
-                                <div style="font-size: 0.75rem; color: #a0a0ff;">
-                                    ${currency.country}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    });
-    
-    legendHTML += `
-        </div>
-        
-        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(0,170,255,0.3);">
-            <div style="color: #8888cc; font-size: 0.8rem; text-align: center;">
-                <i class="fas fa-sync-alt"></i> Курсы обновляются каждые 5 минут
-            </div>
-        </div>
-    `;
-    
-    legend.innerHTML = legendHTML;
-    
-    const currencyElements = legend.querySelectorAll('.legend-currency');
-    currencyElements.forEach(el => {
-        el.addEventListener('click', function() {
-            const currencyCode = this.getAttribute('data-currency');
-            selectCurrencyFromLegend(currencyCode);
-        });
-        
-        el.addEventListener('mouseenter', function() {
-            this.style.background = 'rgba(0, 170, 255, 0.15)';
-            this.style.transform = 'translateX(3px)';
-            
-            const currencyCode = this.getAttribute('data-currency');
-            const marker = markers.find(m => m.userData.code === currencyCode);
-            if (marker && !marker.userData.isHovered) {
-                setMarkerHover(marker);
-            }
-        });
-        
-        el.addEventListener('mouseleave', function() {
-            this.style.background = 'rgba(255, 255, 255, 0.05)';
-            this.style.transform = 'translateX(0)';
-            
-            const currencyCode = this.getAttribute('data-currency');
-            const marker = markers.find(m => m.userData.code === currencyCode);
-            if (marker && !marker.userData.isHovered) {
-                resetMarkerHover(marker);
-            }
-        });
-    });
-}
-
-function getRegionColor(region) {
-    const colors = {
-        'North America': '#ff0000',
-        'South America': '#00cc88',
-        'Europe': '#0033cc',
-        'Asia': '#ff6600',
-        'Oceania': '#00008b',
-        'Africa': '#008751',
-        'CIS': '#00afca'
-    };
-    return colors[region] || '#00aaff';
-}
-
-function selectCurrencyFromLegend(currencyCode) {
-    const currency = currencyData.find(c => c.code === currencyCode);
-    if (currency) {
-        selectCurrency(currency);
-        
-        const marker = markers.find(m => m.userData.code === currencyCode);
-        if (marker) {
-            setMarkerSelected(marker);
-            
-            if (controls) {
-                const markerPosition = marker.position.clone();
-                const lookAtPosition = markerPosition.clone().multiplyScalar(0.8);
-                
-                controls.autoRotate = false;
-                
-                const startTarget = controls.target.clone();
-                const startPosition = camera.position.clone();
-                
-                const duration = 1000;
-                const startTime = Date.now();
-                
-                function animateCamera() {
-                    const elapsed = Date.now() - startTime;
-                    const progress = Math.min(elapsed / duration, 1);
-                    
-                    const easeProgress = 1 - Math.pow(1 - progress, 3);
-                    
-                    controls.target.lerpVectors(startTarget, lookAtPosition, easeProgress);
-                    camera.position.lerpVectors(startPosition, 
-                        new THREE.Vector3(
-                            lookAtPosition.x * 1.5,
-                            lookAtPosition.y + 0.5,
-                            lookAtPosition.z * 1.5 + 2
-                        ), 
-                        easeProgress
-                    );
-                    
-                    if (progress < 1) {
-                        requestAnimationFrame(animateCamera);
-                    }
-                }
-                
-                animateCamera();
-            }
-        }
+    // Выполняем конвертацию
+    if (window.HoloApp && window.HoloApp.convertCurrency) {
+        const amount = parseFloat(document.getElementById('amountInput')?.value) || 1000;
+        const fromCurrency = document.getElementById('fromCurrency')?.value || 'USD';
+        window.HoloApp.convertCurrency(amount, fromCurrency, currency.code);
     }
 }
 
 function showToast(message) {
-    if (window.HoloApp && window.HoloApp.showToast) {
-        window.HoloApp.showToast(message);
-        return;
-    }
-    
-    const toastContainer = document.getElementById('toastContainer') || createToastContainer();
+    // Используем существующую систему тостов или создаем простую
     const toast = document.createElement('div');
-    toast.className = 'toast';
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 170, 255, 0.9);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 25px;
+        font-family: 'Exo 2', sans-serif;
+        font-size: 0.9rem;
+        z-index: 10001;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        animation: fadeInUp 0.3s ease-out;
+    `;
+    
     toast.innerHTML = `
         <div style="display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-check-circle" style="color: #00ffaa;"></i>
-            <div>${message}</div>
+            <i class="fas fa-check-circle" style="font-size: 1.1rem;"></i>
+            <span>${message}</span>
         </div>
     `;
     
-    toastContainer.appendChild(toast);
+    document.body.appendChild(toast);
     
     setTimeout(() => {
         toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
+        toast.style.transform = 'translateX(-50%) translateY(10px)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
     }, 3000);
-}
-
-function createToastContainer() {
-    const container = document.createElement('div');
-    container.id = 'toastContainer';
-    container.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 10000;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 350px;
-    `;
-    document.body.appendChild(container);
-    return container;
 }
 
 function onWindowResize() {
@@ -1198,12 +1306,33 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (typeof THREE !== 'undefined') {
             initHoloGlobe();
+        } else {
+            console.error('Three.js не загружен!');
+            // Показываем сообщение об ошибке
+            const loading = document.getElementById('globeLoading');
+            if (loading) {
+                loading.innerHTML = `
+                    <i class="fas fa-exclamation-triangle" style="color: #ff4757; font-size: 2rem; margin-bottom: 10px;"></i>
+                    <div>Ошибка загрузки 3D глобуса</div>
+                    <div class="loading-sub">Пожалуйста, обновите страницу</div>
+                `;
+            }
         }
-    }, 1500);
+    }, 500);
 });
 
+// Экспорт для глобального доступа
 window.HoloGlobe = { 
     init: initHoloGlobe,
-    selectCurrency: selectCurrencyFromLegend,
-    getCurrencyData: () => currencyData
+    selectCurrency: selectCurrency,
+    getCurrencyData: () => currencyData,
+    isMobile: isMobile,
+    cleanup: function() {
+        // Очистка ресурсов
+        if (renderer) {
+            renderer.dispose();
+        }
+        markers = [];
+        mobileHitboxes = [];
+    }
 };
