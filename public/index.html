@@ -1852,7 +1852,7 @@
             z-index: 10000;
             display: none;
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
-            pointer-events: auto;
+            pointer-events: none;
             opacity: 0;
             transition: opacity 0.2s ease-out;
         }
@@ -1884,38 +1884,10 @@
             transition: all 0.3s;
             flex: 1;
             text-align: center;
-            touch-action: manipulation;
-            min-height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
         }
         
         .tooltip-btn:hover {
             background: rgba(0, 150, 255, 0.8);
-        }
-        
-        /* ===== ИСПРАВЛЕНИЯ ДЛЯ МОБИЛЬНЫХ ТУЛТИПОВ ===== */
-        @media (max-width: 767px) {
-            #globeTooltip {
-                max-width: 85vw;
-                width: 85vw;
-                left: 50% !important;
-                top: 50% !important;
-                transform: translate(-50%, -50%) !important;
-                min-width: 280px;
-            }
-            
-            .tooltip-controls {
-                flex-direction: column;
-                gap: 6px;
-            }
-            
-            .tooltip-btn {
-                padding: 10px 12px;
-                min-height: 44px;
-            }
         }
     </style>
     
@@ -2568,10 +2540,9 @@
         let isUserInteracting = false;
         let hoverTimeout = null;
         let tooltipVisible = false;
-        let tooltipClickMode = false;
-        let clickTooltipTimeout = null;
+        let tooltipClickMode = false; // Новый флаг для кликового тултипа
 
-        // Определяем устройство
+        // Определяем устройство (исправлено для гибридных устройств)
         const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
         const isDesktop = !isMobile || window.innerWidth >= 768;
         console.log('📱 Устройство:', isMobile ? 'Мобильное' : 'Десктоп', isDesktop ? '(Десктопный режим)' : '');
@@ -2734,8 +2705,8 @@
                 });
             }
             
-            // Взаимодействие - УНИФИЦИРОВАННАЯ И ИСПРАВЛЕННАЯ ВЕРСИЯ
-            setupUnifiedInteractivity(canvas);
+            // Взаимодействие - УПРОЩЕННАЯ И ИСПРАВЛЕННАЯ ВЕРСИЯ
+            setupFixedInteractivity(canvas);
             
             // Анимация
             function animate() {
@@ -2760,8 +2731,6 @@
             window.HoloGlobe.camera = camera;
             window.HoloGlobe.renderer = renderer;
             window.HoloGlobe.controls = controls;
-            window.HoloGlobe.hideTooltip = hideTooltip;
-            window.HoloGlobe.selectCurrentMarker = selectCurrentMarker;
         }
 
         function createEarth() {
@@ -2822,7 +2791,7 @@
                 z-index: 10000;
                 display: none;
                 box-shadow: 0 15px 35px rgba(0, 0, 0, 0.7);
-                pointer-events: auto;
+                pointer-events: none;
                 opacity: 0;
                 transition: opacity 0.2s ease-out;
             `;
@@ -2870,16 +2839,10 @@
             infoTooltip.style.top = posY + 'px';
             infoTooltip.style.display = 'block';
             
-            // Для мобильных устройств позиционируем по центру
-            if (isMobile && isClickTooltip) {
-                infoTooltip.style.left = '50%';
-                infoTooltip.style.top = '50%';
-                infoTooltip.style.transform = 'translate(-50%, -50%)';
-            }
-            
             // Для кликовых тултипов делаем их более устойчивыми
             if (isClickTooltip) {
                 infoTooltip.classList.add('globe-tooltip-stable');
+                infoTooltip.style.pointerEvents = 'auto';
                 
                 // Добавляем кнопку закрытия в кликовый тултип
                 infoTooltip.innerHTML += `
@@ -2894,17 +2857,12 @@
                 `;
             } else {
                 infoTooltip.classList.remove('globe-tooltip-stable');
+                infoTooltip.style.pointerEvents = 'none';
             }
             
             requestAnimationFrame(() => {
                 infoTooltip.style.opacity = '1';
             });
-            
-            // Для кликовых тултипов сбрасываем таймер автоскрытия
-            if (isClickTooltip && clickTooltipTimeout) {
-                clearTimeout(clickTooltipTimeout);
-                clickTooltipTimeout = null;
-            }
         }
 
         function hideTooltip() {
@@ -2914,12 +2872,7 @@
             tooltipClickMode = false;
             infoTooltip.style.opacity = '0';
             infoTooltip.classList.remove('globe-tooltip-stable');
-            
-            // Сбрасываем выделение маркера
-            if (selectedMarker) {
-                resetMarkerSelection(selectedMarker);
-                selectedMarker = null;
-            }
+            infoTooltip.style.pointerEvents = 'none';
             
             setTimeout(() => {
                 if (infoTooltip && !tooltipVisible) {
@@ -3136,16 +3089,14 @@
             });
         }
 
-        // УНИФИЦИРОВАННАЯ ФУНКЦИЯ ДЛЯ НАСТРОЙКИ ИНТЕРАКТИВНОСТИ
-        function setupUnifiedInteractivity(canvas) {
-            console.log('Настраиваю унифицированную интерактивность для всех устройств');
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ ДЛЯ НАСТРОЙКИ ИНТЕРАКТИВНОСТИ
+        function setupFixedInteractivity(canvas) {
+            console.log('Настраиваю исправленную интерактивность');
             
             let isDragging = false;
             let dragStartX = 0;
             let dragStartY = 0;
             const dragThreshold = 5;
-            let lastClickTime = 0;
-            const doubleClickDelay = 300;
             
             // Общая функция для получения координат события
             function getEventPosition(event) {
@@ -3170,14 +3121,12 @@
                 mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
                 mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
                 
-                return { clientX, clientY, rect };
+                return { clientX, clientY };
             }
             
             // Функция для поиска пересечений
-            function findIntersects(clientX, clientY, rect) {
-                if (!rect) {
-                    rect = canvas.getBoundingClientRect();
-                }
+            function findIntersects(clientX, clientY) {
+                const rect = canvas.getBoundingClientRect();
                 mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
                 mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
                 
@@ -3201,27 +3150,22 @@
                 return null;
             }
             
-            // Обработка клика/тапа на маркер
-            function handleMarkerClick(marker, clientX, clientY, isTouch = false) {
-                const currentTime = Date.now();
-                const isDoubleClick = (currentTime - lastClickTime) < doubleClickDelay;
-                lastClickTime = currentTime;
+            // Обработка клика/тапа
+            function handleClickOrTap(clientX, clientY, isTouch = false) {
+                const intersects = findIntersects(clientX, clientY);
                 
-                if (isDoubleClick) {
-                    // Двойной клик - снимаем выделение
-                    if (selectedMarker === marker) {
-                        resetMarkerSelection(marker);
-                        selectedMarker = null;
-                        hideTooltip();
-                        if (controls && !isUserInteracting) {
-                            setTimeout(() => {
-                                controls.autoRotate = true;
-                            }, 1000);
-                        }
+                if (intersects.length > 0) {
+                    const marker = getMarkerFromObject(intersects[0].object);
+                    if (marker) {
+                        handleMarkerClick(marker, clientX, clientY, isTouch);
+                        return true;
                     }
-                    return;
                 }
-                
+                return false;
+            }
+            
+            // Обработка клика на маркер
+            function handleMarkerClick(marker, clientX, clientY, isTouch = false) {
                 // Снимаем выделение с предыдущего маркера
                 if (selectedMarker && selectedMarker !== marker) {
                     resetMarkerSelection(selectedMarker);
@@ -3239,23 +3183,14 @@
                     selectCurrency(marker.userData);
                     showCurrencyTooltip(clientX, clientY, marker.userData, true, isTouch);
                     
-                    // На мобильных устанавливаем долгоживущий тултип
+                    // На мобильных НЕ скрываем автоматически
                     if (isTouch) {
-                        if (clickTooltipTimeout) {
-                            clearTimeout(clickTooltipTimeout);
-                        }
-                        clickTooltipTimeout = setTimeout(() => {
-                            if (selectedMarker === marker && tooltipVisible) {
-                                // Через 30 секунд предлагаем закрыть тултип
-                                if (infoTooltip && !infoTooltip.querySelector('.auto-close-hint')) {
-                                    const hint = document.createElement('div');
-                                    hint.className = 'auto-close-hint';
-                                    hint.style.cssText = 'font-size: 0.75rem; color: #8888cc; text-align: center; margin-top: 10px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;';
-                                    hint.innerHTML = '<i class="fas fa-clock"></i> Тултип закроется через 30 секунд';
-                                    infoTooltip.appendChild(hint);
-                                }
+                        // Только на мобильных добавляем задержку перед возможным скрытием
+                        setTimeout(() => {
+                            if (selectedMarker === marker) {
+                                // Тултип остается видимым до явного закрытия
                             }
-                        }, 30000); // 30 секунд
+                        }, 10000); // Через 10 секунд можно скрыть
                     }
                 } else {
                     // Повторный клик на тот же маркер - снимаем выделение
@@ -3272,10 +3207,10 @@
             }
             
             // Обработка наведения
-            function handleHover(clientX, clientY, rect) {
-                if (isUserInteracting || selectedMarker || tooltipClickMode) return;
+            function handleHover(clientX, clientY) {
+                if (isUserInteracting || selectedMarker) return;
                 
-                const intersects = findIntersects(clientX, clientY, rect);
+                const intersects = findIntersects(clientX, clientY);
                 
                 if (hoverTimeout) {
                     clearTimeout(hoverTimeout);
@@ -3298,7 +3233,7 @@
                         canvas.style.cursor = 'pointer';
                         
                         hoverTimeout = setTimeout(() => {
-                            if (hoveredMarker === newHoveredMarker && !isUserInteracting && !selectedMarker) {
+                            if (hoveredMarker === newHoveredMarker && !isUserInteracting) {
                                 showCurrencyTooltip(clientX, clientY, hoveredMarker.userData, false, false);
                             }
                         }, 500);
@@ -3308,8 +3243,8 @@
                 }
             }
             
-            // Обработчик для всех устройств - начало взаимодействия
-            function handlePointerStart(event) {
+            // Touch события
+            function handleTouchStart(event) {
                 event.preventDefault();
                 
                 const pos = getEventPosition(event);
@@ -3319,91 +3254,120 @@
                 dragStartY = pos.clientY;
                 isDragging = false;
                 
-                // Проверяем, есть ли маркер под указателем
-                const intersects = findIntersects(pos.clientX, pos.clientY, pos.rect);
+                // Проверяем, есть ли маркер под пальцем
+                const intersects = findIntersects(pos.clientX, pos.clientY);
                 if (intersects.length > 0) {
-                    // Предотвращаем вращение при клике на маркер
+                    // Предотвращаем вращение при тапе на маркер
                     isUserInteracting = true;
-                    canvas.style.cursor = 'pointer';
-                } else {
-                    canvas.style.cursor = 'grabbing';
                 }
             }
             
-            // Обработчик движения
-            function handlePointerMove(event) {
+            function handleTouchMove(event) {
+                event.preventDefault();
+                
+                if (!isUserInteracting) return;
+                
                 const pos = getEventPosition(event);
                 if (!pos) return;
                 
-                if (isUserInteracting) {
-                    // Определяем, было ли движение для драга
-                    const dx = Math.abs(pos.clientX - dragStartX);
-                    const dy = Math.abs(pos.clientY - dragStartY);
+                // Определяем, было ли движение
+                const dx = Math.abs(pos.clientX - dragStartX);
+                const dy = Math.abs(pos.clientY - dragStartY);
+                
+                if (dx > dragThreshold || dy > dragThreshold) {
+                    isDragging = true;
+                    hideHoverTooltip();
                     
-                    if (dx > dragThreshold || dy > dragThreshold) {
-                        isDragging = true;
-                        hideHoverTooltip();
-                        
-                        if (hoveredMarker) {
-                            resetMarkerHover(hoveredMarker);
-                            hoveredMarker = null;
-                        }
+                    if (hoveredMarker) {
+                        resetMarkerHover(hoveredMarker);
+                        hoveredMarker = null;
                     }
-                } else {
-                    // Обработка наведения
-                    handleHover(pos.clientX, pos.clientY, pos.rect);
                 }
             }
             
-            // Обработчик окончания взаимодействия
-            function handlePointerEnd(event) {
+            function handleTouchEnd(event) {
+                event.preventDefault();
+                
                 const pos = getEventPosition(event);
                 if (!pos) return;
                 
-                // Если было движение, не обрабатываем как клик
+                // Если было движение, не обрабатываем как тап
                 if (isDragging) {
                     isDragging = false;
                     isUserInteracting = false;
-                    canvas.style.cursor = 'grab';
                     return;
                 }
                 
-                // Проверяем клик на маркер
-                const intersects = findIntersects(pos.clientX, pos.clientY, pos.rect);
-                if (intersects.length > 0) {
-                    const marker = getMarkerFromObject(intersects[0].object);
-                    if (marker) {
-                        handleMarkerClick(marker, pos.clientX, pos.clientY, event.type.includes('touch'));
-                        event.stopPropagation();
-                        event.preventDefault();
-                    }
-                } else if (selectedMarker) {
-                    // Клик вне маркера - на десктопе снимаем выделение
-                    if (!isMobile) {
-                        resetMarkerSelection(selectedMarker);
-                        selectedMarker = null;
-                        hideTooltip();
-                        
-                        if (controls && !isUserInteracting) {
-                            setTimeout(() => {
-                                controls.autoRotate = true;
-                            }, 1000);
-                        }
-                    }
+                // Обрабатываем тап
+                const clickedOnMarker = handleClickOrTap(pos.clientX, pos.clientY, true);
+                
+                if (!clickedOnMarker && selectedMarker) {
+                    // Тап вне маркера - не скрываем выбранный маркер на мобильных
+                    // Оставляем выбранный маркер видимым
                 }
                 
                 isUserInteracting = false;
-                canvas.style.cursor = 'grab';
             }
             
-            // Обработчик для мыши
+            // Mouse события
+            function handleMouseMove(event) {
+                if (isUserInteracting) return;
+                
+                const pos = getEventPosition(event);
+                if (!pos) return;
+                
+                handleHover(pos.clientX, pos.clientY);
+            }
+            
+            function handleMouseDown(event) {
+                if (event.button === 0) {
+                    const pos = getEventPosition(event);
+                    if (!pos) return;
+                    
+                    dragStartX = pos.clientX;
+                    dragStartY = pos.clientY;
+                    isDragging = false;
+                }
+            }
+            
+            function handleMouseUp(event) {
+                if (event.button === 0) {
+                    const pos = getEventPosition(event);
+                    if (!pos) return;
+                    
+                    // Определяем, было ли движение
+                    const dx = Math.abs(pos.clientX - dragStartX);
+                    const dy = Math.abs(pos.clientY - dragStartY);
+                    
+                    if (dx <= dragThreshold && dy <= dragThreshold) {
+                        // Обрабатываем клик
+                        const clickedOnMarker = handleClickOrTap(pos.clientX, pos.clientY, false);
+                        
+                        if (!clickedOnMarker && selectedMarker) {
+                            // Клик вне маркера - снимаем выделение
+                            resetMarkerSelection(selectedMarker);
+                            selectedMarker = null;
+                            hideTooltip();
+                            
+                            if (controls && !isUserInteracting) {
+                                setTimeout(() => {
+                                    controls.autoRotate = true;
+                                }, 1000);
+                            }
+                        }
+                    }
+                    
+                    isDragging = false;
+                }
+            }
+            
             function handleMouseLeave() {
                 if (hoveredMarker) {
                     resetMarkerHover(hoveredMarker);
                     hoveredMarker = null;
                 }
                 hideHoverTooltip();
-                canvas.style.cursor = 'default';
+                canvas.style.cursor = 'grab';
                 
                 if (hoverTimeout) {
                     clearTimeout(hoverTimeout);
@@ -3412,33 +3376,45 @@
             }
             
             // Удаляем старые обработчики
-            canvas.removeEventListener('touchstart', handlePointerStart);
-            canvas.removeEventListener('touchmove', handlePointerMove);
-            canvas.removeEventListener('touchend', handlePointerEnd);
-            canvas.removeEventListener('mousedown', handlePointerStart);
-            canvas.removeEventListener('mousemove', handlePointerMove);
-            canvas.removeEventListener('mouseup', handlePointerEnd);
+            canvas.removeEventListener('touchstart', handleTouchStart);
+            canvas.removeEventListener('touchmove', handleTouchMove);
+            canvas.removeEventListener('touchend', handleTouchEnd);
+            canvas.removeEventListener('mousemove', handleMouseMove);
+            canvas.removeEventListener('mousedown', handleMouseDown);
+            canvas.removeEventListener('mouseup', handleMouseUp);
             canvas.removeEventListener('mouseleave', handleMouseLeave);
             canvas.removeEventListener('click', () => {});
             
-            // Предотвращаем стандартное поведение браузера
-            canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-            
-            // Назначаем унифицированные обработчики
+            // Назначаем новые обработчики
             if (isMobile) {
-                console.log('📱 Использую унифицированные touch события');
+                console.log('📱 Использую touch события');
                 
-                canvas.addEventListener('touchstart', handlePointerStart, { passive: false });
-                canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
-                canvas.addEventListener('touchend', handlePointerEnd, { passive: false });
+                canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+                canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+                canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+                
+                // Предотвращаем контекстное меню
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault());
                 
             } else {
-                console.log('🖱️ Использую унифицированные mouse события');
+                console.log('🖱️ Использую mouse события');
                 
-                canvas.addEventListener('mousedown', handlePointerStart);
-                canvas.addEventListener('mousemove', handlePointerMove);
-                canvas.addEventListener('mouseup', handlePointerEnd);
+                canvas.addEventListener('mousemove', handleMouseMove);
+                canvas.addEventListener('mousedown', handleMouseDown);
+                canvas.addEventListener('mouseup', handleMouseUp);
                 canvas.addEventListener('mouseleave', handleMouseLeave);
+                
+                canvas.addEventListener('mousedown', (event) => {
+                    if (event.button === 0) {
+                        canvas.style.cursor = 'grabbing';
+                    }
+                });
+                
+                canvas.addEventListener('mouseup', (event) => {
+                    if (event.button === 0) {
+                        canvas.style.cursor = 'grab';
+                    }
+                });
             }
             
             // Инициализируем курсор
@@ -3559,9 +3535,9 @@
             let closeInstructions = '';
             if (isClick) {
                 if (isMobileDevice) {
-                    closeInstructions = 'Используйте кнопки ниже для управления';
+                    closeInstructions = 'Тапните кнопку "Закрыть" ниже';
                 } else {
-                    closeInstructions = 'Кликните вне маркера или дважды кликните для отмены';
+                    closeInstructions = 'Кликните вне маркера для отмены';
                 }
             } else {
                 closeInstructions = 'Кликните для выбора валюты';
@@ -3655,10 +3631,6 @@
         function selectCurrentMarker() {
             if (selectedMarker) {
                 selectCurrency(selectedMarker.userData);
-                // После выбора скрываем тултип через короткую задержку
-                setTimeout(() => {
-                    hideTooltip();
-                }, 1500);
             }
         }
 
@@ -4220,25 +4192,6 @@
                     
                     // Обновляем конвертацию
                     document.getElementById('convertBtn').click();
-                });
-            }
-            
-            // 16. Закрытие тултипов при клике вне их
-            document.addEventListener('click', function(e) {
-                const tooltip = document.getElementById('globeTooltip');
-                if (tooltip && tooltip.style.display === 'block' && !tooltip.contains(e.target)) {
-                    // Не закрываем кликовые тултипы на мобильных при клике вне
-                    if (!isMobile || !tooltip.classList.contains('globe-tooltip-stable')) {
-                        hideTooltip();
-                    }
-                }
-            });
-            
-            // 17. Предотвращаем закрытие тултипа при клике внутри него
-            const tooltip = document.getElementById('globeTooltip');
-            if (tooltip) {
-                tooltip.addEventListener('click', function(e) {
-                    e.stopPropagation();
                 });
             }
         });
