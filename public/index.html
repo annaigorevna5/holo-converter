@@ -2525,9 +2525,8 @@
     <!-- Toast Notifications Container -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- Scripts -->
+    <!-- ИСПРАВЛЕННЫЙ СКРИПТ ГЛОБУСА -->
     <script>
-        // ===== ИСПРАВЛЕННАЯ ВЕРСИЯ ГЛОБУСА =====
         console.log('🌍 ЗАПУСК ИСПРАВЛЕННОГО ГЛОБУСА');
 
         let scene, camera, renderer, controls, globe;
@@ -2540,7 +2539,6 @@
         let isUserInteracting = false;
         let hoverTimeout = null;
         let tooltipVisible = false;
-        let tooltipClickMode = false;
 
         // Определяем устройство
         const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -2688,9 +2686,6 @@
                 controls.enableDamping = true;
                 controls.dampingFactor = 0.05;
                 
-                // ВАЖНОЕ ИСПРАВЛЕНИЕ: Отключаем OrbitControls при клике на маркеры
-                controls.enableRotate = true;
-                
                 controls.addEventListener('start', () => {
                     isUserInteracting = true;
                     hideHoverTooltip();
@@ -2707,7 +2702,7 @@
                 });
             }
             
-            // Взаимодействие - УНИВЕРСАЛЬНАЯ РЕАЛИЗАЦИЯ
+            // Взаимодействие - УНИВЕРСАЛЬНАЯ РЕАЛИЗАЦИЯ ДЛЯ ВСЕХ УСТРОЙСТВ
             setupUniversalInteractivity(canvas);
             
             // Анимация
@@ -2726,13 +2721,6 @@
             window.addEventListener('resize', onWindowResize);
             
             console.log(`✅ Глобус запущен с ${markers.length} маркерами-флагами`);
-            
-            // Сохраняем ссылки для глобального доступа
-            window.HoloGlobe = window.HoloGlobe || {};
-            window.HoloGlobe.scene = scene;
-            window.HoloGlobe.camera = camera;
-            window.HoloGlobe.renderer = renderer;
-            window.HoloGlobe.controls = controls;
         }
 
         function createEarth() {
@@ -2806,7 +2794,6 @@
             
             infoTooltip.innerHTML = content;
             tooltipVisible = true;
-            tooltipClickMode = isClickTooltip;
             
             if (controls && controls.autoRotate) {
                 controls.autoRotate = false;
@@ -2871,7 +2858,6 @@
             if (!infoTooltip || !tooltipVisible) return;
             
             tooltipVisible = false;
-            tooltipClickMode = false;
             infoTooltip.style.opacity = '0';
             infoTooltip.classList.remove('globe-tooltip-stable');
             infoTooltip.style.pointerEvents = 'none';
@@ -2893,7 +2879,7 @@
 
         function hideHoverTooltip() {
             // Скрываем только не-кликовые тултипы
-            if (tooltipClickMode) return;
+            if (selectedMarker) return;
             hideTooltip();
         }
 
@@ -3101,6 +3087,7 @@
             const dragThreshold = 5;
             let lastTouchTime = 0;
             const DOUBLE_TAP_DELAY = 300;
+            let isTouchMoving = false;
             
             // Функция для получения координат события
             function getEventPosition(event) {
@@ -3187,10 +3174,11 @@
                     selectCurrency(marker.userData);
                     showCurrencyTooltip(clientX, clientY, marker.userData, true, isTouch);
                     
-                    // На мобильных добавляем задержку для стабильности
+                    // На мобильных добавляем обработку закрытия по тапу вне тултипа
                     if (isTouch) {
-                        // Тултип остается видимым до явного закрытия
-                        console.log('Мобильный тултип активирован');
+                        setTimeout(() => {
+                            setupMobileTooltipClose();
+                        }, 100);
                     }
                 } else {
                     // Повторный клик на тот же маркер - снимаем выделение
@@ -3204,6 +3192,42 @@
                         }, 1000);
                     }
                 }
+            }
+            
+            // Настройка закрытия тултипа на мобильных
+            function setupMobileTooltipClose() {
+                if (!isMobile || !selectedMarker) return;
+                
+                const closeHandler = function(event) {
+                    const tooltip = document.getElementById('globeTooltip');
+                    const canvas = document.getElementById('globeCanvas');
+                    
+                    if (tooltip && canvas) {
+                        const isClickInTooltip = tooltip.contains(event.target);
+                        const isClickInCanvas = canvas.contains(event.target);
+                        
+                        if (!isClickInTooltip && !isClickInCanvas) {
+                            // Клик вне тултипа и вне канваса - закрываем тултип
+                            resetMarkerSelection(selectedMarker);
+                            selectedMarker = null;
+                            hideTooltip();
+                            
+                            if (controls && !isUserInteracting) {
+                                setTimeout(() => {
+                                    controls.autoRotate = true;
+                                }, 1000);
+                            }
+                            
+                            // Удаляем обработчик
+                            document.removeEventListener('click', closeHandler);
+                        }
+                    }
+                };
+                
+                // Добавляем обработчик с задержкой
+                setTimeout(() => {
+                    document.addEventListener('click', closeHandler);
+                }, 50);
             }
             
             // Обработка наведения (только для десктопа)
@@ -3253,6 +3277,7 @@
                 dragStartX = pos.clientX;
                 dragStartY = pos.clientY;
                 isDragging = false;
+                isTouchMoving = false;
                 
                 // Останавливаем автоповорот при любом взаимодействии
                 if (controls) {
@@ -3263,7 +3288,7 @@
             function onPointerMove(event) {
                 event.preventDefault();
                 
-                if (selectedMarker && tooltipClickMode) {
+                if (selectedMarker && tooltipVisible) {
                     // Если есть выбранный маркер, не обрабатываем движение как драг
                     return;
                 }
@@ -3277,6 +3302,7 @@
                 
                 if (dx > dragThreshold || dy > dragThreshold) {
                     isDragging = true;
+                    isTouchMoving = true;
                     hideHoverTooltip();
                     
                     if (hoveredMarker) {
@@ -3298,8 +3324,9 @@
                 if (!pos) return;
                 
                 // Если было движение, не обрабатываем как клик/тап
-                if (isDragging) {
+                if (isDragging && isTouchMoving) {
                     isDragging = false;
+                    isTouchMoving = false;
                     setTimeout(() => {
                         isUserInteracting = false;
                     }, 100);
@@ -3328,7 +3355,7 @@
                 
                 if (!clickedOnMarker) {
                     // Клик/тап вне маркера
-                    if (selectedMarker && !tooltipClickMode) {
+                    if (selectedMarker && !tooltipVisible) {
                         // На мобильных не снимаем выделение при клике вне маркера
                         // если тултип в режиме клика
                         if (!isMobile) {
@@ -3343,6 +3370,7 @@
                 }
                 
                 isDragging = false;
+                isTouchMoving = false;
                 isUserInteracting = false;
             }
             
@@ -3415,33 +3443,6 @@
                 
                 canvas.style.cursor = 'grab';
             }
-            
-            // Обработка клика на документе для закрытия тултипа
-            document.addEventListener('click', function(event) {
-                if (selectedMarker && tooltipClickMode) {
-                    // Проверяем, был ли клик вне тултипа и вне канваса
-                    const tooltip = document.getElementById('globeTooltip');
-                    const canvas = document.getElementById('globeCanvas');
-                    
-                    if (tooltip && canvas) {
-                        const isClickInTooltip = tooltip.contains(event.target);
-                        const isClickInCanvas = canvas.contains(event.target);
-                        
-                        if (!isClickInTooltip && !isClickInCanvas) {
-                            // Клик вне тултипа и вне канваса - закрываем тултип
-                            resetMarkerSelection(selectedMarker);
-                            selectedMarker = null;
-                            hideTooltip();
-                            
-                            if (controls && !isUserInteracting) {
-                                setTimeout(() => {
-                                    controls.autoRotate = true;
-                                }, 1000);
-                            }
-                        }
-                    }
-                }
-            });
         }
 
         function setMarkerHover(marker) {
@@ -3770,13 +3771,7 @@
             selectCurrentMarker: selectCurrentMarker,
             hideTooltip: hideTooltip,
             getCurrencyData: () => currencyData,
-            isMobile: isMobile,
-            cleanup: function() {
-                if (renderer) {
-                    renderer.dispose();
-                }
-                markers = [];
-            }
+            isMobile: isMobile
         });
     </script>
     
