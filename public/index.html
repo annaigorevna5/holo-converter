@@ -3175,304 +3175,66 @@
         // ИНТЕРАКТИВНОСТЬ - ИСПРАВЛЕННАЯ ВЕРСИЯ
         // ==============================================
 
-function setupInteractivity(canvas) {
-    console.log('Настраиваю интерактивность для', isMobile ? 'мобильных устройств' : 'десктопа');
-    
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    const dragThreshold = 5;
-    let lastTapTime = 0;
-    const doubleTapDelay = 300;
-    let tapCount = 0;
-    
-    // ОЧЕНЬ ВАЖНО: Даем OrbitControls работать с событиями мыши
-    if (!isMobile && controls) {
-        // OrbitControls сам навешивает свои обработчики
-        // Мы не должны их переопределять полностью
-        console.log('Оставляем стандартные OrbitControls для десктопа');
-        
-        // Только добавляем наши обработчики для маркеров
-        canvas.addEventListener('click', handleCanvasClick);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('mouseleave', handleMouseLeave);
-        
-        // Настройка курсора
-        canvas.style.cursor = 'grab';
-        
-        canvas.addEventListener('mousedown', () => {
-            canvas.style.cursor = 'grabbing';
-        });
-        
-        canvas.addEventListener('mouseup', () => {
-            canvas.style.cursor = hoveredMarker ? 'pointer' : 'grab';
-        });
-        
-        return; // Выходим рано для десктопа
-    }
-    
-    // Для мобильных устройств - наша кастомная логика
-    if (isMobile) {
-        console.log('📱 Использую кастомные обработчики для мобильных');
-        
-        // Очищаем предыдущие обработчики
-        canvas.removeEventListener('touchstart', handlePointerDown);
-        canvas.removeEventListener('touchmove', handlePointerMove);
-        canvas.removeEventListener('touchend', handlePointerUp);
-        canvas.removeEventListener('touchcancel', handlePointerLeave);
-        
-        // Назначаем новые
-        canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
-        canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
-        canvas.addEventListener('touchend', handlePointerUp, { passive: false });
-        canvas.addEventListener('touchcancel', handlePointerLeave, { passive: false });
-        
-        canvas.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            return false;
-        });
-        
-        canvas.style.cursor = 'default';
-    }
-    
-    // Функции для десктопа (будут использоваться только если isMobile=false)
-    function handleCanvasClick(event) {
-        if (isUserInteracting || !event.isPrimary) return;
-        
-        const pos = getEventPosition(event);
-        if (!pos) return;
-        
-        const intersects = findIntersects(pos.clientX, pos.clientY);
-        
-        if (intersects.length > 0) {
-            const marker = getMarkerFromObject(intersects[0].object);
-            if (marker) {
-                handleMarkerClick(marker, pos.clientX, pos.clientY);
-                event.stopPropagation(); // Предотвращаем дальнейшую обработку
-            }
-        } else {
-            // Клик вне маркера
-            if (selectedMarker) {
-                resetMarkerSelection(selectedMarker);
-                selectedMarker = null;
-            }
-            hideGlobeTooltip();
-        }
-    }
-    
-    function handleMouseMove(event) {
-        if (isUserInteracting || tooltipVisible) return;
-        
-        const pos = getEventPosition(event);
-        if (!pos) return;
-        
-        handleHover(pos.clientX, pos.clientY);
-    }
-    
-    function handleMouseLeave() {
-        if (hoveredMarker) {
-            resetMarkerHover(hoveredMarker);
-            hoveredMarker = null;
-        }
-        canvas.style.cursor = 'grab';
-    }
-    
-    // Остальные функции (getEventPosition, findIntersects и т.д.) остаются как были
-    function getEventPosition(event) {
-        const rect = canvas.getBoundingClientRect();
-        let clientX, clientY;
-        
-        if (event.type.includes('touch')) {
-            if (event.touches.length > 0) {
-                clientX = event.touches[0].clientX;
-                clientY = event.touches[0].clientY;
-            } else if (event.changedTouches.length > 0) {
-                clientX = event.changedTouches[0].clientX;
-                clientY = event.changedTouches[0].clientY;
+        function setupInteractivity(canvas) {
+            console.log('Настраиваю интерактивность для', isMobile ? 'мобильных устройств' : 'десктопа');
+            
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            const dragThreshold = 5;
+            let lastTapTime = 0;
+            const doubleTapDelay = 300;
+            let tapCount = 0;
+            
+            // Очищаем предыдущие обработчики
+            canvas.removeEventListener('mousedown', handlePointerDown);
+            canvas.removeEventListener('mousemove', handlePointerMove);
+            canvas.removeEventListener('mouseup', handlePointerUp);
+            canvas.removeEventListener('mouseleave', handlePointerLeave);
+            canvas.removeEventListener('touchstart', handlePointerDown);
+            canvas.removeEventListener('touchmove', handlePointerMove);
+            canvas.removeEventListener('touchend', handlePointerUp);
+            canvas.removeEventListener('touchcancel', handlePointerLeave);
+            
+            // Назначаем новые обработчики
+            if (isMobile) {
+                // Для мобильных устройств
+                canvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+                canvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+                canvas.addEventListener('touchend', handlePointerUp, { passive: false });
+                canvas.addEventListener('touchcancel', handlePointerLeave, { passive: false });
+                
+                // Предотвращаем контекстное меню
+                canvas.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    return false;
+                });
+                
+                canvas.style.cursor = 'default';
             } else {
-                return null;
-            }
-        } else {
-            clientX = event.clientX;
-            clientY = event.clientY;
-        }
-        
-        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-        
-        return { clientX, clientY };
-    }
-    
-    function findIntersects(clientX, clientY) {
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
-        
-        raycaster.setFromCamera(mouse, camera);
-        return raycaster.intersectObjects(markers, true);
-    }
-    
-    function getMarkerFromObject(object) {
-        if (!object) return null;
-        
-        let current = object;
-        while (current) {
-            if (current.userData && current.userData.type === 'currency') {
-                return current;
-            }
-            current = current.parent;
-        }
-        
-        return null;
-    }
-    
-    function handleHover(clientX, clientY) {
-        const intersects = findIntersects(clientX, clientY);
-        
-        if (hoveredMarker && (!intersects.length || getMarkerFromObject(intersects[0].object) !== hoveredMarker)) {
-            resetMarkerHover(hoveredMarker);
-            hoveredMarker = null;
-            canvas.style.cursor = 'grab';
-        }
-        
-        if (intersects.length > 0) {
-            const newHoveredMarker = getMarkerFromObject(intersects[0].object);
-            
-            if (newHoveredMarker && newHoveredMarker !== hoveredMarker) {
-                hoveredMarker = newHoveredMarker;
-                setMarkerHover(hoveredMarker);
-                canvas.style.cursor = 'pointer';
-            }
-        } else {
-            canvas.style.cursor = 'grab';
-        }
-    }
-    
-    // Функции для мобильных (остаются как были)
-    function handlePointerDown(event) {
-        event.preventDefault();
-        
-        const pos = getEventPosition(event);
-        if (!pos) return;
-        
-        dragStartX = pos.clientX;
-        dragStartY = pos.clientY;
-        isDragging = false;
-        
-        if (controls) {
-            controls.autoRotate = false;
-        }
-        
-        if (isMobile) {
-            const currentTime = Date.now();
-            const tapLength = currentTime - lastTapTime;
-            
-            if (tapLength < doubleTapDelay && tapLength > 0) {
-                tapCount = 2;
-            } else {
-                tapCount = 1;
+                // Для десктопа
+                canvas.addEventListener('mousedown', handlePointerDown);
+                canvas.addEventListener('mousemove', handlePointerMove);
+                canvas.addEventListener('mouseup', handlePointerUp);
+                canvas.addEventListener('mouseleave', handlePointerLeave);
+                
+                canvas.addEventListener('mousedown', (event) => {
+                    if (event.button === 0) {
+                        canvas.style.cursor = 'grabbing';
+                    }
+                });
+                
+                canvas.addEventListener('mouseup', (event) => {
+                    if (event.button === 0) {
+                        canvas.style.cursor = hoveredMarker ? 'pointer' : 'grab';
+                    }
+                });
+                
+                canvas.style.cursor = 'grab';
             }
             
-            lastTapTime = currentTime;
-        }
-    }
-    
-    function handlePointerMove(event) {
-        event.preventDefault();
-        
-        const pos = getEventPosition(event);
-        if (!pos) return;
-        
-        const dx = Math.abs(pos.clientX - dragStartX);
-        const dy = Math.abs(pos.clientY - dragStartY);
-        
-        if (dx > dragThreshold || dy > dragThreshold) {
-            isDragging = true;
-            hideGlobeTooltip();
-            
-            if (hoveredMarker) {
-                resetMarkerHover(hoveredMarker);
-                hoveredMarker = null;
-            }
-        }
-    }
-    
-    function handlePointerUp(event) {
-        event.preventDefault();
-        
-        const pos = getEventPosition(event);
-        if (!pos) return;
-        
-        if (isDragging) {
-            isDragging = false;
-            setTimeout(() => {
-                isUserInteracting = false;
-            }, 100);
-            return;
-        }
-        
-        if (isMobile && tapCount === 2) {
-            if (controls) {
-                controls.reset();
-            }
-            tapCount = 0;
-            return;
-        }
-        
-        const intersects = findIntersects(pos.clientX, pos.clientY);
-        
-        if (intersects.length > 0) {
-            const marker = getMarkerFromObject(intersects[0].object);
-            if (marker) {
-                handleMarkerClick(marker, pos.clientX, pos.clientY);
-            }
-        } else {
-            if (selectedMarker) {
-                resetMarkerSelection(selectedMarker);
-                selectedMarker = null;
-            }
-            hideGlobeTooltip();
-        }
-        
-        isDragging = false;
-        isUserInteracting = false;
-    }
-    
-    function handlePointerLeave() {
-        if (hoveredMarker) {
-            resetMarkerHover(hoveredMarker);
-            hoveredMarker = null;
-        }
-    }
-    
-    function handleMarkerClick(marker, clientX, clientY) {
-        if (selectedMarker && selectedMarker !== marker) {
-            resetMarkerSelection(selectedMarker);
-        }
-        
-        if (selectedMarker !== marker) {
-            setMarkerSelected(marker);
-            selectedMarker = marker;
-            
-            selectCurrencyForConversion(marker.userData);
-            showGlobeTooltip(clientX, clientY, marker.userData);
-            showToast(`Selected: ${marker.userData.code} (${marker.userData.country})`);
-        } else {
-            resetMarkerSelection(marker);
-            selectedMarker = null;
-            hideGlobeTooltip();
-            
-            if (controls && !isUserInteracting) {
-                setTimeout(() => {
-                    controls.autoRotate = true;
-                }, 1000);
-            }
-        }
-    }
-}
-
-// Функция получения координат события (для обратной совместимости)
-function getEventPosition(event) {
+            // Функция получения координат события
+            function getEventPosition(event) {
                 const rect = canvas.getBoundingClientRect();
                 let clientX, clientY;
                 
