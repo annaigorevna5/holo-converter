@@ -260,9 +260,11 @@ function setAmount(amount) {
 
 // Установка целевой валюты
 function setToCurrency(currency) {
+    console.log('setToCurrency called with:', currency);
     if (currency && currency !== currentToCurrency) {
         currentToCurrency = currency;
         updateDisplay();
+        showToast(`Валюта установлена: ${currency}`);
     }
 }
 
@@ -405,31 +407,9 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-// Запуск приложения при загрузке DOM
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, starting app...');
-    // Даем время на загрузку всех элементов
-    setTimeout(initApp, 500);
-});
-
-// Экспорт функций для глобуса
-window.HoloApp = {
-    setToCurrency: setToCurrency,
-    getCurrencySymbol: getCurrencySymbol,
-    getCurrencyFlag: getCurrencyFlag,
-    showToast: showToast
-};
-// Добавь в конец main-fixed.js:
-window.HoloApp = {
-    setToCurrency: function(currencyCode) {
-        currentToCurrency = currencyCode;
-        updateDisplay();
-        performConversion();
-    }
-};
-
 // Функция для обновления UI при выборе валюты
-function updateCurrencyDisplay(currency) {
+function updateCurrencyDisplay(currencyCode) {
+    console.log('updateCurrencyDisplay called with:', currencyCode);
     const display = document.getElementById('toCurrencyDisplay');
     if (display) {
         const flag = display.querySelector('.currency-flag');
@@ -437,36 +417,20 @@ function updateCurrencyDisplay(currency) {
         const name = display.querySelector('.currency-name');
         const input = document.getElementById('toCurrency');
         
-        if (flag) flag.textContent = getCurrencyFlag(currency);
-        if (code) code.textContent = currency;
-        if (name) name.textContent = getCurrencyName(currency);
-        if (input) input.value = currency;
+        if (flag) flag.textContent = getCurrencyFlag(currencyCode);
+        if (code) code.textContent = currencyCode;
+        if (name) name.textContent = getCurrencyName(currencyCode);
+        if (input) input.value = currencyCode;
     }
     
     // Обновляем символ валюты если нужно
     const symbol = document.getElementById('inputCurrencySymbol');
     if (symbol) {
-        symbol.textContent = getCurrencySymbol(currency);
+        symbol.textContent = getCurrencySymbol(currencyCode);
     }
 }
 
-// Обновляем глобальную функцию HoloApp
-window.HoloApp = {
-    setToCurrency: function(currencyCode) {
-        currentToCurrency = currencyCode;
-        updateCurrencyDisplay(currencyCode);
-        performConversion();
-        
-        // Показываем уведомление
-        showToast(`Валюта установлена: ${currencyCode}`);
-    },
-    getCurrencySymbol: getCurrencySymbol,
-    getCurrencyFlag: getCurrencyFlag,
-    showToast: showToast,
-    getCurrencyName: getCurrencyName
-};
-
-// Дополнительные вспомогательные функции
+// Получение имени валюты
 function getCurrencyName(currencyCode) {
     const names = {
         'USD': 'US Dollar',
@@ -481,7 +445,56 @@ function getCurrencyName(currencyCode) {
         'BRL': 'Brazilian Real',
         'RUB': 'Russian Ruble',
         'INR': 'Indian Rupee',
-        'KRW': 'Korean Won'
+        'KRW': 'Korean Won',
+        'TRY': 'Turkish Lira',
+        'ZAR': 'South African Rand',
+        'SEK': 'Swedish Krona',
+        'NOK': 'Norwegian Krone',
+        'DKK': 'Danish Krone',
+        'PLN': 'Polish Zloty',
+        'CZK': 'Czech Koruna',
+        'HUF': 'Hungarian Forint',
+        'SGD': 'Singapore Dollar',
+        'HKD': 'Hong Kong Dollar',
+        'AED': 'UAE Dirham',
+        'SAR': 'Saudi Riyal',
+        'THB': 'Thai Baht',
+        'MYR': 'Malaysian Ringgit',
+        'IDR': 'Indonesian Rupiah',
+        'PHP': 'Philippine Peso',
+        'NZD': 'New Zealand Dollar',
+        'BGN': 'Bulgarian Lev',
+        'RON': 'Romanian Leu',
+        'KZT': 'Kazakhstani Tenge',
+        'UAH': 'Ukrainian Hryvnia',
+        'BYN': 'Belarusian Ruble'
     };
     return names[currencyCode] || currencyCode;
 }
+
+// Запуск приложения при загрузке DOM
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, starting app...');
+    // Даем время на загрузку всех элементов
+    setTimeout(initApp, 500);
+});
+
+// ==============================================
+// ГЛОБАЛЬНЫЙ ОБЪЕКТ ДЛЯ СВЯЗИ С ГЛОБУСОМ
+// ==============================================
+
+window.HoloApp = {
+    setToCurrency: function(currencyCode) {
+        console.log('HoloApp.setToCurrency called with:', currencyCode);
+        currentToCurrency = currencyCode;
+        updateCurrencyDisplay(currencyCode);
+        performConversion();
+        showToast(`Валюта установлена: ${currencyCode}`);
+    },
+    getCurrencySymbol: getCurrencySymbol,
+    getCurrencyFlag: getCurrencyFlag,
+    showToast: showToast,
+    getCurrencyName: getCurrencyName
+};
+
+console.log('✅ HoloApp global object registered:', window.HoloApp);
